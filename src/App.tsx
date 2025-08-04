@@ -20,11 +20,13 @@ import { ScrollToTop } from "./components/common/ScrollToTop";
 import XeTiicDashboard from "./pages/Dashboard/XeTiicDashboard";
 import CompanyPage from "./pages/Company/CompanyPage";
 import RoutesManagement from "./pages/Routes/RoutesManagement";
+import { CustomerList } from "./pages/Customer";
+import { StationList } from "./pages/Station";
 
 export default function App() {
   return (
     <>
-      <Router>
+      <Router basename="/XeTiic">
         <ScrollToTop />
         <Routes>
           {/* Dashboard Layout */}
@@ -36,6 +38,12 @@ export default function App() {
 
             {/* Routes Management */}
             <Route path="/routes" element={<RoutesManagement />} />
+
+            {/* Customer Management */}
+            <Route path="/customers" element={<CustomerList />} />
+
+            {/* Station Management */}
+            <Route path="/stations" element={<StationList />} />
 
             {/* Others Page */}
             <Route path="/profile" element={<UserProfiles />} />

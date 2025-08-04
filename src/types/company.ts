@@ -66,3 +66,52 @@ export interface UpdateRouteRequest {
   companyId: number;
   license?: File;
 }
+
+export interface Customer {
+  id: number;
+  customerId: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  address: string;
+  dateOfBirth: string;
+  gender: string;
+  createAt: string;
+  updateAt: string;
+  status: number;
+  avatar: string | null;
+}
+
+export interface CustomerResponse {
+  data: Customer[];
+  page: number;
+  amount: number;
+  totalPage: number;
+  totalCount: number;
+}
+
+export interface Station {
+  id: number;
+  stationId: string;
+  stationName: string;
+  address: string;
+  city: string;
+  province: string;
+  phone: string;
+  email: string;
+  description: string;
+  status: number;
+  createAt: string;
+  updateAt: string;
+  latitude?: number;
+  longitude?: number;
+}
+
+export interface StationResponse {
+  data: Station[];
+  page: number;
+  amount: number;
+  totalPage: number;
+  totalCount: number;
+}

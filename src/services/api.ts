@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { CompanyResponse, RouteResponse, CreateRouteRequest, UpdateRouteRequest } from '../types/company';
+import { CompanyResponse, RouteResponse, CreateRouteRequest, UpdateRouteRequest, CustomerResponse, StationResponse } from '../types/company';
 
 const baseURL = 'https://bobts-server-e7dxfwh7e5g9e3ad.malaysiawest-01.azurewebsites.net';
 
@@ -44,7 +44,7 @@ api.interceptors.response.use(
 export const companyService = {
   async getAllCompanies(page: number = 1, amount: number = 50): Promise<CompanyResponse> {
     try {
-      const response = await api.get<CompanyResponse>('/api/Company/GetAllCompanyy', {
+      const response = await api.get<CompanyResponse>('/api/Company/GetAllCompany', {
         params: {
           Page: page,
           Amount: amount,
@@ -136,6 +136,38 @@ export const routeService = {
       return response.data;
     } catch (error) {
       console.error('Error deleting route:', error);
+      throw error;
+    }
+  },
+};
+
+export const customerService = {
+  async getAllCustomers(): Promise<CustomerResponse> {
+    try {
+      const response = await api.get<CustomerResponse>('/api/Customers/GetAllCustomers', {
+        params: {
+          All: true
+        }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching customers:', error);
+      throw error;
+    }
+  },
+};
+
+export const stationService = {
+  async getAllStations(): Promise<StationResponse> {
+    try {
+      const response = await api.get<StationResponse>('/api/Station', {
+        params: {
+          All: true
+        }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching stations:', error);
       throw error;
     }
   },
