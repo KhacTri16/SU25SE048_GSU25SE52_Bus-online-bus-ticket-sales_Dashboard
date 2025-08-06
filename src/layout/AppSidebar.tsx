@@ -45,14 +45,17 @@ const navItems: NavItem[] = [
     icon: <CalenderIcon />,
     name: "Lịch trình",
     subItems: [
-      { name: "Lịch xe", path: "/schedule", pro: false },
+      { name: "Quản lý xe ", path: "/schedule", pro: false },
       { name: "Quản lý tuyến", path: "/routes", pro: false },
     ],
   },
   {
     icon: <GroupIcon />,
     name: "Công ty",
-    path: "/company",
+    subItems: [
+      { name: "Danh sách công ty", path: "/company", pro: false },
+      { name: "Quản lý xe theo công ty", path: "/company-buses", pro: false },
+    ],
   },
   {
     icon: <BoxCubeIcon />,

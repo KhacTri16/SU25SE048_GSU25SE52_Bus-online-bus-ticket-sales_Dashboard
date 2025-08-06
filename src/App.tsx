@@ -21,11 +21,12 @@ import Blank from "./pages/Blank";
 import AppLayout from "./layout/AppLayout";
 import { ScrollToTop } from "./components/common/ScrollToTop";
 import XeTiicDashboard from "./pages/Dashboard/XeTiicDashboard";
-import CompanyPage from "./pages/Company/CompanyPage";
+import { CompanyPage, CompanyBusManagement } from "./pages/Company";
 import RoutesManagement from "./pages/Routes/RoutesManagement";
 import { CustomerList } from "./pages/Customer";
 import StationList from "./pages/Station/StationList";
 import { RoleManagement } from "./pages/Role";
+import { BusManagement } from "./pages/Bus";
 import AuthGuard from "./components/auth/AuthGuard";
 
 export default function App() {
@@ -50,11 +51,15 @@ export default function App() {
                         <Route path="/" element={<AppLayout />}>
                           <Route index element={<XeTiicDashboard />} />
 
-                          {/* Company Page */}
+                          {/* Company Pages */}
                           <Route path="company" element={<CompanyPage />} />
+                          <Route path="company-buses" element={<CompanyBusManagement />} />
 
                           {/* Routes Management */}
                           <Route path="routes" element={<RoutesManagement />} />
+
+                          {/* Bus Management */}
+                          <Route path="schedule" element={<BusManagement />} />
 
                           {/* Customer Management */}
                           <Route path="customers" element={<CustomerList />} />

@@ -68,19 +68,12 @@ export interface UpdateRouteRequest {
 }
 
 export interface Customer {
-  id: number;
   customerId: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone: string;
-  address: string;
-  dateOfBirth: string;
-  gender: string;
-  createAt: string;
-  updateAt: string;
-  status: number;
-  avatar: string | null;
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string | null;
+  ticketId: string | null;
+  ticketStatus: number | null;
 }
 
 export interface CustomerResponse {
@@ -99,7 +92,6 @@ export interface Station {
   locationId?: number;
   status: number;
   isDeleted: boolean;
-  // Legacy fields for backward compatibility
   stationName?: string;
   address?: string;
   city?: string;
@@ -159,4 +151,22 @@ export interface UpdateRoleRequest {
   name: string;
   description: string;
   permission: boolean;
+}
+
+export interface Bus {
+  id: number;
+  busId: string;
+  name: string;
+  numberPlate: string;
+  typeBusId: number;
+  companyName: string;
+  isDeleted: boolean;
+}
+
+export interface BusResponse {
+  data: Bus[];
+  page: number;
+  amount: number;
+  totalPage: number;
+  totalCount: number;
 }

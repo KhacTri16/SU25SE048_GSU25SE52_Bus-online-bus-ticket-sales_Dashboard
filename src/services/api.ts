@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { CompanyResponse, RouteResponse, CreateRouteRequest, UpdateRouteRequest, CustomerResponse, StationResponse, CreateStationRequest, UpdateStationRequest, Station, RoleResponse, CreateRoleRequest, UpdateRoleRequest, Role } from '../types/company';
+import { CompanyResponse, RouteResponse, CreateRouteRequest, UpdateRouteRequest, Customer, CustomerResponse, StationResponse, CreateStationRequest, UpdateStationRequest, Station, RoleResponse, CreateRoleRequest, UpdateRoleRequest, Role, BusResponse } from '../types/company';
 
 const baseURL = 'https://bobts-server-e7dxfwh7e5g9e3ad.malaysiawest-01.azurewebsites.net';
 
@@ -142,9 +142,9 @@ export const routeService = {
 };
 
 export const customerService = {
-  async getAllCustomers(): Promise<CustomerResponse> {
+  async getAllCustomers(): Promise<Customer[]> {
     try {
-      const response = await api.get<CustomerResponse>('/api/Customers/GetAllCustomers', {
+      const response = await api.get<Customer[]>('/api/Customers/GetAllCustomers', {
         params: {
           All: true
         }
@@ -260,6 +260,22 @@ export const roleService = {
       return response.data;
     } catch (error) {
       console.error('Error deleting role:', error);
+      throw error;
+    }
+  },
+};
+
+export const busService = {
+  async getAllBuses(): Promise<BusResponse> {
+    try {
+      const response = await api.get<BusResponse>('/api/Bus', {
+        params: {
+          All: true
+        }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching buses:', error);
       throw error;
     }
   },

@@ -1,30 +1,37 @@
 import React, { useState, useEffect } from 'react';
-import { customerService } from '../../services/api';
-import { Customer } from '../../types/company';
+import { busService } from '../../services/api';
+import { Bus } from '../../types/company';
 
-const CustomerList: React.FC = () => {
-  const [customers, setCustomers] = useState<Customer[]>([]);
+const BusManagement: React.FC = () => {
+  const [buses, setBuses] = useState<Bus[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
 
   useEffect(() => {
-    fetchCustomers();
+    fetchBuses();
   }, []);
 
-  const fetchCustomers = async () => {
+  const fetchBuses = async () => {
     try {
       setLoading(true);
       setError(null);
-      console.log('Fetching customers...');
+      console.log('Fetching buses...');
       
-      const response = await customerService.getAllCustomers();
-      console.log('Customers response:', response);
+      const response = await busService.getAllBuses();
+      console.log('Buses response:', response);
       
-      setCustomers(response || []);
+      if (response && response.data && Array.isArray(response.data)) {
+        setBuses(response.data);
+        setError(null);
+      } else {
+        console.warn('Invalid response structure:', response);
+        setBuses([]);
+        setError('Dữ liệu trả về không hợp lệ');
+      }
     } catch (err: any) {
       console.error('Error details:', err);
-      let errorMessage = 'Không thể tải danh sách khách hàng. ';
+      let errorMessage = 'Không thể tải danh sách xe. ';
       
       if (err.response) {
         errorMessage += `Server error: ${err.response.status} - ${err.response.statusText}`;
@@ -40,50 +47,20 @@ const CustomerList: React.FC = () => {
     }
   };
 
-  const filteredCustomers = customers.filter(customer =>
-    customer.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    customer.customerEmail.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (customer.customerPhone && customer.customerPhone.includes(searchTerm))
+  const filteredBuses = (buses || []).filter(bus =>
+    bus.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    bus.busId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    bus.numberPlate?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    bus.companyName?.toLowerCase().includes(searchTerm.toLowerCase())
   );
-
-  const getStatusBadge = (ticketStatus: number | null) => {
-    if (ticketStatus === null) {
-      return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400">
-          Chưa có vé
-        </span>
-      );
-    }
-    
-    switch (ticketStatus) {
-      case 0:
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400">
-            Đã đặt
-          </span>
-        );
-      case 4:
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400">
-            Đã thanh toán
-          </span>
-        );
-      default:
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400">
-            Trạng thái: {ticketStatus}
-          </span>
-        );
-    }
-  };
 
   // Tính toán thống kê
   const getStatistics = () => {
-    const totalCustomers = customers.length;
-    const customersWithTickets = customers.filter(customer => customer.ticketId !== null).length;
-    const customersWithPaidTickets = customers.filter(customer => customer.ticketStatus === 4).length;
+    const totalBuses = buses.length;
+    const activeBuses = buses.filter(bus => !bus.isDeleted).length;
+    const deletedBuses = buses.filter(bus => bus.isDeleted).length;
 
-    return { totalCustomers, customersWithTickets, customersWithPaidTickets };
+    return { totalBuses, activeBuses, deletedBuses };
   };
 
   if (loading) {
@@ -106,12 +83,12 @@ const CustomerList: React.FC = () => {
           <details className="text-left text-sm text-gray-600 dark:text-gray-400 mb-4">
             <summary className="cursor-pointer">Chi tiết lỗi</summary>
             <div className="mt-2 p-2 bg-gray-100 dark:bg-gray-800 rounded">
-              <p>Endpoint: https://bobts-server-e7dxfwh7e5g9e3ad.malaysiawest-01.azurewebsites.net/api/Customers/GetAllCustomers</p>
+              <p>Endpoint: https://bobts-server-e7dxfwh7e5g9e3ad.malaysiawest-01.azurewebsites.net/api/Bus</p>
               <p>Parameters: All=true</p>
             </div>
           </details>
           <button 
-            onClick={fetchCustomers}
+            onClick={fetchBuses}
             className="mt-4 px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700"
           >
             Thử lại
@@ -130,12 +107,12 @@ const CustomerList: React.FC = () => {
         <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Tổng khách hàng</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.totalCustomers}</p>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Tổng xe</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.totalBuses}</p>
             </div>
             <div className="p-3 bg-blue-100 rounded-full dark:bg-blue-900/20">
               <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
             </div>
           </div>
@@ -144,12 +121,12 @@ const CustomerList: React.FC = () => {
         <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Có vé</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.customersWithTickets}</p>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Đang hoạt động</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.activeBuses}</p>
             </div>
             <div className="p-3 bg-green-100 rounded-full dark:bg-green-900/20">
               <svg className="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
           </div>
@@ -158,35 +135,35 @@ const CustomerList: React.FC = () => {
         <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Đã thanh toán</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.customersWithPaidTickets}</p>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Đã xóa</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.deletedBuses}</p>
             </div>
-            <div className="p-3 bg-pink-100 rounded-full dark:bg-pink-900/20">
-              <svg className="w-6 h-6 text-pink-600 dark:text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <div className="p-3 bg-red-100 rounded-full dark:bg-red-900/20">
+              <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
               </svg>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Customer List */}
+      {/* Bus List */}
       <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Danh sách khách hàng
+              Danh sách xe
             </h3>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              Tổng số: {customers.length} khách hàng
+              Tổng số: {buses.length} xe
             </p>
           </div>
           <div className="flex gap-2">
             <button className="px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 text-sm font-medium">
-              Thêm khách hàng mới
+              Thêm xe mới
             </button>
             <button 
-              onClick={fetchCustomers}
+              onClick={fetchBuses}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
             >
               🔄 Làm mới
@@ -199,7 +176,7 @@ const CustomerList: React.FC = () => {
           <div className="relative">
             <input
               type="text"
-              placeholder="Tìm kiếm theo tên, email hoặc số điện thoại..."
+              placeholder="Tìm kiếm theo tên xe, mã xe, biển số, công ty..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:border-gray-700 dark:text-white"
@@ -217,16 +194,13 @@ const CustomerList: React.FC = () => {
             <thead className="bg-gray-50 dark:bg-gray-900/50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">
-                  Khách hàng
+                  Thông tin xe
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">
-                  Liên hệ
+                  Biển số
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">
-                  Vé xe
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">
-                  Trạng thái
+                  Công ty
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">
                   Hành động
@@ -234,54 +208,53 @@ const CustomerList: React.FC = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200 dark:bg-transparent dark:divide-gray-800">
-              {filteredCustomers.length === 0 ? (
+              {filteredBuses.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
-                    {searchTerm ? 'Không tìm thấy khách hàng nào phù hợp' : 'Chưa có khách hàng nào'}
+                  <td colSpan={4} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                    {searchTerm ? 'Không tìm thấy xe nào phù hợp' : 'Chưa có xe nào'}
                   </td>
                 </tr>
               ) : (
-                filteredCustomers.map((customer) => (
-                  <tr key={customer.customerId} className="hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                filteredBuses.map((bus) => (
+                  <tr key={bus.id} className="hover:bg-gray-50 dark:hover:bg-white/[0.02]">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="flex-shrink-0 h-12 w-12">
-                          <div className="h-12 w-12 rounded-lg bg-pink-100 flex items-center justify-center dark:bg-pink-900/20">
-                            <span className="text-pink-600 dark:text-pink-400 font-semibold text-lg">
-                              {customer.customerName.charAt(0)}
-                            </span>
+                          <div className="h-12 w-12 rounded-lg bg-blue-100 flex items-center justify-center dark:bg-blue-900/20">
+                            <svg className="h-6 w-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
                           </div>
                         </div>
                         <div className="ml-4">
                           <div className="text-sm font-medium text-gray-900 dark:text-white">
-                            {customer.customerName}
+                            {bus.name}
                           </div>
                           <div className="text-sm text-gray-500 dark:text-gray-400">
-                            ID: {customer.customerId}
+                            ID: {bus.busId}
                           </div>
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900 dark:text-white">{customer.customerEmail}</div>
-                      <div className="text-sm text-gray-500 dark:text-gray-400">
-                        {customer.customerPhone || 'Chưa có số điện thoại'}
+                      <div className="text-sm text-gray-900 dark:text-white font-medium">
+                        {bus.numberPlate}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900 dark:text-white">
-                        {customer.ticketId || 'Chưa có vé'}
+                        {bus.companyName}
                       </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {getStatusBadge(customer.ticketStatus)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <button className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 mr-3">
                         Xem
                       </button>
-                      <button className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300">
+                      <button className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300 mr-3">
                         Sửa
+                      </button>
+                      <button className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300">
+                        Xóa
                       </button>
                     </td>
                   </tr>
@@ -291,9 +264,9 @@ const CustomerList: React.FC = () => {
           </table>
         </div>
 
-        {filteredCustomers.length === 0 && !loading && (
+        {filteredBuses.length === 0 && !loading && (
           <div className="text-center py-8">
-            <p className="text-gray-500 dark:text-gray-400">Không có dữ liệu khách hàng</p>
+            <p className="text-gray-500 dark:text-gray-400">Không có dữ liệu xe</p>
           </div>
         )}
       </div>
@@ -301,4 +274,4 @@ const CustomerList: React.FC = () => {
   );
 };
 
-export default CustomerList;
+export default BusManagement; 
