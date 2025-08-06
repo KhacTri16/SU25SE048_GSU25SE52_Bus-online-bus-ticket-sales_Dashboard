@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { CompanyResponse, RouteResponse, CreateRouteRequest, UpdateRouteRequest, CustomerResponse, StationResponse } from '../types/company';
+import { CompanyResponse, RouteResponse, CreateRouteRequest, UpdateRouteRequest, CustomerResponse, StationResponse, CreateStationRequest, UpdateStationRequest, Station, RoleResponse, CreateRoleRequest, UpdateRoleRequest, Role } from '../types/company';
 
 const baseURL = 'https://bobts-server-e7dxfwh7e5g9e3ad.malaysiawest-01.azurewebsites.net';
 
@@ -171,6 +171,149 @@ export const stationService = {
       throw error;
     }
   },
+
+  async getStationById(id: number): Promise<Station> {
+    try {
+      const response = await api.get<Station>(`/api/Station/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching station by id:', error);
+      throw error;
+    }
+  },
+
+  async createStation(stationData: CreateStationRequest): Promise<any> {
+    try {
+      const response = await api.post('/api/Station', stationData);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating station:', error);
+      throw error;
+    }
+  },
+
+  async updateStation(id: number, stationData: UpdateStationRequest): Promise<any> {
+    try {
+      const response = await api.put(`/api/Station/${id}`, stationData);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating station:', error);
+      throw error;
+    }
+  },
+
+  async deleteStation(id: number): Promise<any> {
+    try {
+      const response = await api.delete(`/api/Station/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error deleting station:', error);
+      throw error;
+    }
+  },
+};
+
+export const roleService = {
+  async getAllRoles(): Promise<RoleResponse> {
+    try {
+      const response = await api.get<RoleResponse>('/api/Role');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching roles:', error);
+      throw error;
+    }
+  },
+
+  async getRoleById(id: number): Promise<Role> {
+    try {
+      const response = await api.get<Role>(`/api/Role/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching role by id:', error);
+      throw error;
+    }
+  },
+
+  async createRole(roleData: CreateRoleRequest): Promise<any> {
+    try {
+      const response = await api.post('/api/Role', roleData);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating role:', error);
+      throw error;
+    }
+  },
+
+  async updateRole(id: number, roleData: UpdateRoleRequest): Promise<any> {
+    try {
+      const response = await api.put(`/api/Role/${id}`, roleData);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating role:', error);
+      throw error;
+    }
+  },
+
+  async deleteRole(id: number): Promise<any> {
+    try {
+      const response = await api.delete(`/api/Role/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error deleting role:', error);
+      throw error;
+    }
+  },
+};
+
+// Auth Service
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface RegisterRequest {
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+  role?: string;
+}
+
+export interface AuthResponse {
+  user: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    role: string;
+    permissions: string[];
+    companyId?: string;
+    avatar?: string;
+    isActive: boolean;
+    createdAt: string;
+    updatedAt: string;
+  };
+  token: string;
+  refreshToken?: string;
+}
+
+export interface RefreshTokenRequest {
+  refreshToken: string;
+}
+
+export const authService = {
+  login: (credentials: LoginRequest): Promise<AuthResponse> => api.post('/auth/login', credentials),
+  register: (data: RegisterRequest): Promise<AuthResponse> => api.post('/auth/register', data),
+  logout: (): Promise<void> => api.post('/auth/logout'),
+  refreshToken: (data: RefreshTokenRequest): Promise<AuthResponse> => api.post('/auth/refresh', data),
+  forgotPassword: (email: string): Promise<void> => api.post('/auth/forgot-password', { email }),
+  resetPassword: (token: string, password: string): Promise<void> => api.post('/auth/reset-password', { token, password }),
+  verifyEmail: (token: string): Promise<void> => api.post('/auth/verify-email', { token }),
+  changePassword: (currentPassword: string, newPassword: string): Promise<void> => 
+    api.post('/auth/change-password', { currentPassword, newPassword }),
+  getProfile: (): Promise<AuthResponse['user']> => api.get('/auth/profile'),
+  updateProfile: (data: Partial<AuthResponse['user']>): Promise<AuthResponse['user']> => 
+    api.put('/auth/profile', data),
 };
 
 export default api;

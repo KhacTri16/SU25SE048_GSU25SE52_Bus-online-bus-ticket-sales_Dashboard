@@ -4,8 +4,12 @@ import BookingStatusChart from "../../components/xetiic/BookingStatusChart";
 import RoutesList from "../../components/xetiic/RoutesList";
 import RecentBookings from "../../components/xetiic/RecentBookings";
 import PageMeta from "../../components/common/PageMeta";
+import AdminInfo from "../../components/auth/AdminInfo";
+import { useAuth } from "../../context/AuthContext";
 
 export default function XeTiicDashboard() {
+  const { user, isAdmin } = useAuth();
+
   return (
     <>
       <PageMeta
@@ -13,13 +17,20 @@ export default function XeTiicDashboard() {
         description="Dashboard quản lý hệ thống bán vé xe khách XeTiic"
       />
       
+      {/* Admin Info Section - Only show for first-time login or admin */}
+      {user && (isAdmin() || user.role === 'manager') && (
+        <div className="mb-8">
+          <AdminInfo />
+        </div>
+      )}
+      
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          Chào mừng trở lại! 👋
+          Dashboard Hệ thống XeTiic �
         </h1>
         <p className="text-gray-600 dark:text-gray-400 mt-1">
-          Theo dõi và quản lý hệ thống bán vé xe XeTiic
+          Theo dõi và quản lý hệ thống bán vé xe khách
         </p>
       </div>
 

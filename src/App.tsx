@@ -1,4 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router";
+import { ThemeProvider } from "./context/ThemeContext";
+import { SidebarProvider } from "./context/SidebarContext";
+import { AuthProvider } from "./context/AuthContext";
 import SignIn from "./pages/AuthPages/SignIn";
 import SignUp from "./pages/AuthPages/SignUp";
 import NotFound from "./pages/OtherPage/NotFound";
@@ -21,61 +24,81 @@ import XeTiicDashboard from "./pages/Dashboard/XeTiicDashboard";
 import CompanyPage from "./pages/Company/CompanyPage";
 import RoutesManagement from "./pages/Routes/RoutesManagement";
 import { CustomerList } from "./pages/Customer";
-import { StationList } from "./pages/Station";
+import StationList from "./pages/Station/StationList";
+import { RoleManagement } from "./pages/Role";
+import AuthGuard from "./components/auth/AuthGuard";
 
 export default function App() {
   return (
     <>
       <Router basename="/XeTiic">
-        <ScrollToTop />
-        <Routes>
-          {/* Dashboard Layout */}
-          <Route element={<AppLayout />}>
-            <Route index path="/" element={<XeTiicDashboard />} />
+        <AuthProvider>
+          <ThemeProvider>
+            <SidebarProvider>
+              <ScrollToTop />
+              <Routes>
+                {/* Public routes - Auth Pages */}
+                <Route path="/signin" element={<SignIn />} />
+                <Route path="/signup" element={<SignUp />} />
 
-            {/* Company Page */}
-            <Route path="/company" element={<CompanyPage />} />
+                {/* Protected routes - Dashboard Layout */}
+                <Route
+                  path="/*"
+                  element={
+                    <AuthGuard>
+                      <Routes>
+                        <Route path="/" element={<AppLayout />}>
+                          <Route index element={<XeTiicDashboard />} />
 
-            {/* Routes Management */}
-            <Route path="/routes" element={<RoutesManagement />} />
+                          {/* Company Page */}
+                          <Route path="company" element={<CompanyPage />} />
 
-            {/* Customer Management */}
-            <Route path="/customers" element={<CustomerList />} />
+                          {/* Routes Management */}
+                          <Route path="routes" element={<RoutesManagement />} />
 
-            {/* Station Management */}
-            <Route path="/stations" element={<StationList />} />
+                          {/* Customer Management */}
+                          <Route path="customers" element={<CustomerList />} />
 
-            {/* Others Page */}
-            <Route path="/profile" element={<UserProfiles />} />
-            <Route path="/calendar" element={<Calendar />} />
-            <Route path="/blank" element={<Blank />} />
+                          {/* Station Management */}
+                          <Route path="stations" element={<StationList />} />
 
-            {/* Forms */}
-            <Route path="/form-elements" element={<FormElements />} />
+                          {/* Role Management */}
+                          <Route path="roles" element={<RoleManagement />} />
 
-            {/* Tables */}
-            <Route path="/basic-tables" element={<BasicTables />} />
+                          {/* Others Page */}
+                          <Route path="profile" element={<UserProfiles />} />
+                          <Route path="calendar" element={<Calendar />} />
+                          <Route path="blank" element={<Blank />} />
 
-            {/* Ui Elements */}
-            <Route path="/alerts" element={<Alerts />} />
-            <Route path="/avatars" element={<Avatars />} />
-            <Route path="/badge" element={<Badges />} />
-            <Route path="/buttons" element={<Buttons />} />
-            <Route path="/images" element={<Images />} />
-            <Route path="/videos" element={<Videos />} />
+                          {/* Forms */}
+                          <Route path="form-elements" element={<FormElements />} />
 
-            {/* Charts */}
-            <Route path="/line-chart" element={<LineChart />} />
-            <Route path="/bar-chart" element={<BarChart />} />
-          </Route>
+                          {/* Tables */}
+                          <Route path="basic-tables" element={<BasicTables />} />
 
-          {/* Auth Layout */}
-          <Route path="/signin" element={<SignIn />} />
-          <Route path="/signup" element={<SignUp />} />
+                          {/* Ui Elements */}
+                          <Route path="alerts" element={<Alerts />} />
+                          <Route path="avatars" element={<Avatars />} />
+                          <Route path="badge" element={<Badges />} />
+                          <Route path="buttons" element={<Buttons />} />
+                          <Route path="images" element={<Images />} />
+                          <Route path="videos" element={<Videos />} />
 
-          {/* Fallback Route */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+                          {/* Charts */}
+                          <Route path="line-chart" element={<LineChart />} />
+                          <Route path="bar-chart" element={<BarChart />} />
+
+                          {/* Fallback Route for protected area */}
+                          <Route path="*" element={<NotFound />} />
+                        </Route>
+                      </Routes>
+                    </AuthGuard>
+                  }
+                />
+              </Routes>
+            </SidebarProvider>
+          </ThemeProvider>
+        </AuthProvider>
       </Router>
     </>
   );

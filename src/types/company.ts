@@ -94,18 +94,35 @@ export interface CustomerResponse {
 export interface Station {
   id: number;
   stationId: string;
-  stationName: string;
-  address: string;
-  city: string;
-  province: string;
-  phone: string;
-  email: string;
-  description: string;
+  name: string;
+  locationName: string;
+  locationId?: number;
   status: number;
-  createAt: string;
-  updateAt: string;
+  isDeleted: boolean;
+  // Legacy fields for backward compatibility
+  stationName?: string;
+  address?: string;
+  city?: string;
+  province?: string;
+  phone?: string;
+  email?: string;
+  description?: string;
+  createAt?: string;
+  updateAt?: string;
   latitude?: number;
   longitude?: number;
+}
+
+export interface CreateStationRequest {
+  name: string;
+  locationId: number;
+  status: number;
+}
+
+export interface UpdateStationRequest {
+  name: string;
+  locationId: number;
+  status: number;
 }
 
 export interface StationResponse {
@@ -114,4 +131,32 @@ export interface StationResponse {
   amount: number;
   totalPage: number;
   totalCount: number;
+}
+
+export interface Role {
+  id: number;
+  name: string;
+  description: string;
+  permission: boolean;
+  isDeleted: boolean;
+}
+
+export interface RoleResponse {
+  data: Role[];
+  page: number;
+  amount: number;
+  totalPage: number;
+  totalCount: number;
+}
+
+export interface CreateRoleRequest {
+  name: string;
+  description: string;
+  permission: boolean;
+}
+
+export interface UpdateRoleRequest {
+  name: string;
+  description: string;
+  permission: boolean;
 }
