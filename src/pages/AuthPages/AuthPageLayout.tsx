@@ -19,60 +19,67 @@ export default function AuthLayout({
         </div>
         
         {/* Right Side Image Section */}
-        <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-600 via-purple-600 to-blue-800 dark:from-gray-800 dark:via-gray-700 dark:to-gray-900 items-center justify-center relative overflow-hidden">
+        <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-600 via-indigo-700 to-purple-800 dark:from-gray-800 dark:via-gray-700 dark:to-gray-900 items-center justify-center relative overflow-hidden">
           {/* Grid Background */}
-          <div className="absolute inset-0">
+          <div className="absolute inset-0 opacity-10">
             <GridShape />
           </div>
           
           {/* Content */}
-          <div className="relative z-10 flex flex-col items-center text-center max-w-md px-8">
+          <div className="relative z-10 flex flex-col items-center text-center max-w-lg px-8">
             {/* Logo */}
-            <Link to="/" className="block mb-8">
-              <div className="flex items-center justify-center w-20 h-20 bg-white/10 backdrop-blur-md rounded-2xl mb-4">
-                <svg className="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 2L2 7v10c0 5.55 3.84 9.74 9 11 5.16-1.26 9-5.45 9-11V7l-10-5z"/>
-                  <path d="M9 12l2 2 4-4" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
+            <Link to="/" className="block mb-12">
+              <div className="flex items-center justify-center w-24 h-24 bg-white/20 backdrop-blur-md rounded-3xl mb-6 shadow-lg">
+                <div className="w-16 h-16 bg-white/30 rounded-2xl flex items-center justify-center">
+                  <span className="text-white font-bold text-2xl">X</span>
+                </div>
               </div>
-              <h2 className="text-2xl font-bold text-white mb-2">XeTiic Dashboard</h2>
+              <h2 className="text-3xl font-bold text-white mb-3 tracking-tight">
+                XeTiic Dashboard
+              </h2>
+              <p className="text-white/80 text-lg font-medium">
+                Hệ thống quản lý bán vé xe khách
+              </p>
             </Link>
             
             {/* Description */}
-            <div className="text-white/90 space-y-4">
-              <h3 className="text-xl font-semibold">
-                Hệ thống quản lý bán vé xe khách
-              </h3>
-              <p className="text-white/70 leading-relaxed">
-                Quản lý stations, routes, bookings và toàn bộ hoạt động kinh doanh vận tải một cách hiệu quả và chuyên nghiệp.
-              </p>
+            <div className="text-white/90 space-y-6">
+              <div className="space-y-4">
+                <h3 className="text-2xl font-semibold leading-tight">
+                  Quản lý vận tải thông minh
+                </h3>
+                <p className="text-white/70 leading-relaxed text-lg">
+                  Hệ thống quản lý toàn diện cho hoạt động vận tải hành khách với công nghệ hiện đại và giao diện thân thiện.
+                </p>
+              </div>
               
               {/* Features */}
-              <div className="text-left space-y-2 mt-6">
-                <div className="flex items-center space-x-3">
-                  <div className="w-2 h-2 bg-white rounded-full"></div>
-                  <span className="text-white/80">Quản lý stations & routes</span>
+              <div className="text-left space-y-4 mt-8">
+                <div className="flex items-center space-x-4">
+                  <div className="w-3 h-3 bg-white rounded-full"></div>
+                  <span className="text-white/90 text-lg">Quản lý tuyến xe & trạm dừng</span>
                 </div>
-                <div className="flex items-center space-x-3">
-                  <div className="w-2 h-2 bg-white rounded-full"></div>
-                  <span className="text-white/80">Hệ thống roles & permissions</span>
+                <div className="flex items-center space-x-4">
+                  <div className="w-3 h-3 bg-white rounded-full"></div>
+                  <span className="text-white/90 text-lg">Hệ thống phân quyền thông minh</span>
                 </div>
-                <div className="flex items-center space-x-3">
-                  <div className="w-2 h-2 bg-white rounded-full"></div>
-                  <span className="text-white/80">Dashboard analytics</span>
+                <div className="flex items-center space-x-4">
+                  <div className="w-3 h-3 bg-white rounded-full"></div>
+                  <span className="text-white/90 text-lg">Báo cáo & thống kê real-time</span>
                 </div>
-                <div className="flex items-center space-x-3">
-                  <div className="w-2 h-2 bg-white rounded-full"></div>
-                  <span className="text-white/80">Modern & responsive UI</span>
+                <div className="flex items-center space-x-4">
+                  <div className="w-3 h-3 bg-white rounded-full"></div>
+                  <span className="text-white/90 text-lg">Giao diện responsive & hiện đại</span>
                 </div>
               </div>
             </div>
           </div>
           
           {/* Decorative Elements */}
-          <div className="absolute top-10 right-10 w-20 h-20 bg-white/5 rounded-full"></div>
-          <div className="absolute bottom-20 left-10 w-32 h-32 bg-white/5 rounded-full"></div>
-          <div className="absolute top-1/2 right-20 w-16 h-16 bg-white/10 rounded-lg transform rotate-45"></div>
+          <div className="absolute top-16 right-16 w-32 h-32 bg-white/5 rounded-full blur-xl"></div>
+          <div className="absolute bottom-32 left-16 w-40 h-40 bg-white/5 rounded-full blur-xl"></div>
+          <div className="absolute top-1/2 right-24 w-20 h-20 bg-white/10 rounded-lg transform rotate-45 blur-sm"></div>
+          <div className="absolute bottom-1/4 left-1/4 w-16 h-16 bg-white/8 rounded-full blur-md"></div>
         </div>
         
         {/* Theme Toggle */}

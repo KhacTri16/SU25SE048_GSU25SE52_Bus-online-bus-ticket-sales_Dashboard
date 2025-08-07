@@ -4,8 +4,11 @@ import { routeService } from "../../services/api";
 import PageMeta from "../../components/common/PageMeta";
 import RouteFormModal from "../../components/Routes/RouteFormModal";
 import DeleteConfirmModal from "../../components/Routes/DeleteConfirmModal";
+import { useAuth } from "../../context/AuthContext";
+import RoleAccessNotice from "../../components/common/RoleAccessNotice";
 
 export default function RoutesManagement() {
+  const { user, isAdmin, isCompanyRestricted, getUserCompanyId, canAccessCompany } = useAuth();
   const [routes, setRoutes] = useState<Route[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -33,9 +36,22 @@ export default function RoutesManagement() {
       setLoading(true);
       setError(null);
       const response = await routeService.getAllRoutes(currentPage, 10, true);
-      setRoutes(response.data);
+      
+      // Filter routes based on user's company if they are company-restricted
+      let filteredRoutes = response.data;
+      if (isCompanyRestricted()) {
+        const userCompanyId = getUserCompanyId();
+        if (userCompanyId) {
+          // Since Route doesn't have companyId, we need to get company name from user's company
+          // For now, we'll show all routes and let the backend handle filtering
+          // This is a temporary solution until we have companyId in Route interface
+          console.log('Company-restricted user, showing all routes (backend should filter)');
+        }
+      }
+      
+      setRoutes(filteredRoutes);
       setTotalPages(response.totalPage);
-      setTotalCount(response.totalCount);
+      setTotalCount(filteredRoutes.length); // Use filtered count
     } catch (err) {
       setError('Không thể tải dữ liệu tuyến đường. Vui lòng thử lại.');
       console.error('Error fetching routes:', err);
@@ -62,6 +78,14 @@ export default function RoutesManagement() {
 
   const handleCreateRoute = async (data: CreateRouteRequest) => {
     try {
+      // If user is company-restricted, automatically set their company ID
+      if (isCompanyRestricted()) {
+        const userCompanyId = getUserCompanyId();
+        if (userCompanyId) {
+          data.companyId = userCompanyId;
+        }
+      }
+      
       await routeService.createRoute(data);
       showMessage('Tạo tuyến đường thành công!', 'success');
       fetchRoutes();
@@ -76,6 +100,10 @@ export default function RoutesManagement() {
     if (!selectedRoute) return;
     
     try {
+      // For now, we'll allow updates since Route doesn't have companyId
+      // Backend should handle company-based access control
+      console.log('Updating route:', selectedRoute.id);
+      
       await routeService.updateRoute(selectedRoute.id, data);
       showMessage('Cập nhật tuyến đường thành công!', 'success');
       fetchRoutes();
@@ -90,6 +118,10 @@ export default function RoutesManagement() {
     if (!selectedRoute) return;
     
     try {
+      // For now, we'll allow deletes since Route doesn't have companyId
+      // Backend should handle company-based access control
+      console.log('Deleting route:', selectedRoute.id);
+      
       setIsDeleting(true);
       await routeService.deleteRoute(selectedRoute.id);
       showMessage('Xóa tuyến đường thành công!', 'success');
@@ -175,6 +207,9 @@ export default function RoutesManagement() {
         description="Quản lý các tuyến đường xe khách trong hệ thống"
       />
       
+      {/* Role-based access notice */}
+      <RoleAccessNotice className="mb-6" />
+
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
           Quản lý tuyến đường

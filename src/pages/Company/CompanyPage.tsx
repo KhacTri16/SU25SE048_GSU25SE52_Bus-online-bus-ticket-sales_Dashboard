@@ -1,5 +1,6 @@
 import CompanyList from "../../components/company/CompanyList";
 import PageMeta from "../../components/common/PageMeta";
+import RoleAccessNotice from "../../components/common/RoleAccessNotice";
 
 export default function CompanyPage() {
   return (
@@ -19,12 +20,13 @@ export default function CompanyPage() {
         </p>
       </div>
 
-      
+      {/* Role Access Notice */}
+      <RoleAccessNotice />
 
-        {/* Company List */}
-        <div className="col-span-12 lg:col-span-9">
-          <CompanyList />
-        </div>
+      {/* Company List */}
+      <div className="col-span-12 lg:col-span-9">
+        <CompanyList />
+      </div>
       
     </>
   );

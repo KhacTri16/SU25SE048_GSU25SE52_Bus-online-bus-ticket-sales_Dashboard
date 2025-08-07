@@ -1,17 +1,18 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { authService, SystemUser, SystemUserLoginResponse, ROLE_PERMISSIONS } from '../services/api';
 
 export interface User {
   id: string;
   email: string;
-  firstName: string;
-  lastName: string;
-  role: 'admin' | 'manager' | 'staff' | 'customer';
-  permissions: string[];
-  companyId?: string;
+  fullName: string;
+  phone: string;
+  address: string;
+  companyId?: string | number;
   avatar?: string;
   isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
+  isDeleted?: boolean;
+  roleId: number;
+  permissions?: string[]; // Add permissions array
 }
 
 export interface AuthState {
@@ -42,7 +43,12 @@ interface AuthContextType extends AuthState {
   hasPermission: (permission: string) => boolean;
   isAdmin: () => boolean;
   isManager: () => boolean;
+  isStaff: () => boolean;
   refreshToken: () => Promise<void>;
+  // Add new helper methods for company-based access control
+  getUserCompanyId: () => number | null;
+  canAccessCompany: (companyId: number | string) => boolean;
+  isCompanyRestricted: () => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -71,26 +77,69 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   useEffect(() => {
     const initializeAuth = () => {
       try {
+        console.log('AuthContext: Initializing auth state...');
         const token = localStorage.getItem('auth_token');
         const userStr = localStorage.getItem('auth_user');
         
+        console.log('AuthContext: Token exists:', !!token);
+        console.log('AuthContext: User exists:', !!userStr);
+        
         if (token && userStr) {
-          const user = JSON.parse(userStr);
+          try {
+            const user = JSON.parse(userStr);
+            console.log('AuthContext: Parsed user:', user);
+            
+            // Validate user has required fields
+            if (user && user.id && user.email && typeof user.roleId === 'number') {
+              setState({
+                user,
+                token,
+                isAuthenticated: true,
+                isLoading: false,
+              });
+              console.log('AuthContext: User authenticated successfully');
+            } else {
+              console.log('AuthContext: Invalid user data, clearing...');
+              localStorage.removeItem('auth_token');
+              localStorage.removeItem('auth_user');
+              setState({
+                user: null,
+                token: null,
+                isAuthenticated: false,
+                isLoading: false,
+              });
+            }
+          } catch (parseError) {
+            console.error('AuthContext: Error parsing user from localStorage:', parseError);
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('auth_user');
+            setState({
+              user: null,
+              token: null,
+              isAuthenticated: false,
+              isLoading: false,
+            });
+          }
+        } else {
+          console.log('AuthContext: No token or user found, setting unauthenticated state');
           setState({
-            user,
-            token,
-            isAuthenticated: true,
+            user: null,
+            token: null,
+            isAuthenticated: false,
             isLoading: false,
           });
-        } else {
-          setState(prev => ({ ...prev, isLoading: false }));
         }
       } catch (error) {
-        console.error('Error initializing auth:', error);
+        console.error('AuthContext: Error initializing auth:', error);
         // Clear corrupted data
         localStorage.removeItem('auth_token');
         localStorage.removeItem('auth_user');
-        setState(prev => ({ ...prev, isLoading: false }));
+        setState({
+          user: null,
+          token: null,
+          isAuthenticated: false,
+          isLoading: false,
+        });
       }
     };
 
@@ -100,25 +149,38 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const login = async (credentials: LoginCredentials): Promise<void> => {
     try {
       setState(prev => ({ ...prev, isLoading: true }));
-
-      // API call would go here - for now using mock data
-      const response = await mockLogin(credentials);
+      // Use the new loginSystemUser method
+      const response: SystemUserLoginResponse = await authService.loginSystemUser(credentials);
+      const { token, systemUser } = response;
       
-      const { user, token } = response;
-
-      // Store in localStorage
+      // Get permissions for the user's role
+      const userPermissions = ROLE_PERMISSIONS[systemUser.roleId] || [];
+      
+      // Map systemUser to User type for context
+      const user: User = {
+        id: systemUser.id.toString(),
+        email: systemUser.email,
+        fullName: systemUser.fullName,
+        phone: systemUser.phone,
+        address: systemUser.address,
+        companyId: systemUser.companyId,
+        avatar: systemUser.avartar,
+        isActive: systemUser.isActive,
+        isDeleted: systemUser.isDeleted,
+        roleId: systemUser.roleId,
+        permissions: userPermissions, // Add permissions
+      };
       localStorage.setItem('auth_token', token);
       localStorage.setItem('auth_user', JSON.stringify(user));
-
       setState({
         user,
         token,
         isAuthenticated: true,
         isLoading: false,
       });
-    } catch (error) {
+    } catch (error: any) {
       setState(prev => ({ ...prev, isLoading: false }));
-      throw error;
+      throw new Error(error?.response?.data?.message || 'Đăng nhập thất bại. Vui lòng thử lại.');
     }
   };
 
@@ -168,16 +230,52 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const hasPermission = (permission: string): boolean => {
     if (!state.user) return false;
-    if (state.user.role === 'admin') return true; // Admin has all permissions
-    return state.user.permissions.includes(permission);
+    
+    // Admin (roleId: 1) has all permissions
+    if (state.user.roleId === 1) return true;
+    
+    // Check if user has the specific permission
+    return state.user.permissions?.includes(permission) || false;
   };
 
   const isAdmin = (): boolean => {
-    return state.user?.role === 'admin' || false;
+    return state.user?.roleId === 1;
   };
 
   const isManager = (): boolean => {
-    return state.user?.role === 'manager' || state.user?.role === 'admin' || false;
+    return state.user?.roleId === 2;
+  };
+
+  const isStaff = (): boolean => {
+    return state.user?.roleId === 3;
+  };
+
+  // Add new helper methods for company-based access control
+  const getUserCompanyId = (): number | null => {
+    if (!state.user?.companyId) return null;
+    return typeof state.user.companyId === 'string' 
+      ? parseInt(state.user.companyId) 
+      : state.user.companyId;
+  };
+
+  const canAccessCompany = (companyId: number | string): boolean => {
+    // Admin can access all companies
+    if (isAdmin()) return true;
+    
+    // Manager and Staff can only access their own company
+    const userCompanyId = getUserCompanyId();
+    if (!userCompanyId) return false;
+    
+    const targetCompanyId = typeof companyId === 'string' 
+      ? parseInt(companyId) 
+      : companyId;
+    
+    return userCompanyId === targetCompanyId;
+  };
+
+  const isCompanyRestricted = (): boolean => {
+    // Only manager and staff are company-restricted
+    return isManager() || isStaff();
   };
 
   const refreshToken = async (): Promise<void> => {
@@ -199,7 +297,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     hasPermission,
     isAdmin,
     isManager,
+    isStaff,
     refreshToken,
+    getUserCompanyId,
+    canAccessCompany,
+    isCompanyRestricted,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -263,13 +365,14 @@ const mockRegister = async (data: RegisterData) => {
     user: {
       id: Date.now().toString(),
       email: data.email,
-      firstName: data.firstName,
-      lastName: data.lastName,
-      role: 'customer' as const,
-      permissions: ['profile.read', 'profile.write'],
+      fullName: data.firstName + ' ' + data.lastName,
+      phone: '',
+      address: '',
+      companyId: '',
+      avatar: '',
       isActive: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      isDeleted: false,
+      roleId: 3, // 3 = customer (example)
     },
     token: 'mock_customer_token_' + Date.now(),
   };

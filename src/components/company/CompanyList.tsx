@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Company } from '../../types/company';
 import { companyService } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 
 export default function CompanyList() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [apiInfo, setApiInfo] = useState<{totalCount: number, totalPage: number} | null>(null);
+  const { getUserCompanyId, isCompanyRestricted, isAdmin } = useAuth();
 
   useEffect(() => {
     const fetchCompanies = async () => {
@@ -19,7 +21,32 @@ export default function CompanyList() {
         const response = await companyService.getAllCompanies(1, 50);
         console.log('Companies response:', response);
         
-        setCompanies(response.data || []);
+        let companiesData = response.data || [];
+        
+        // Apply RBAC filtering for manager and staff
+        if (isCompanyRestricted()) {
+          const userCompanyId = getUserCompanyId();
+          if (userCompanyId) {
+            // Filter by company.id (not company.companyId) since user's companyId matches company.id
+            companiesData = companiesData.filter(company => company.id === userCompanyId);
+            console.log(`Filtered companies for user companyId ${userCompanyId}:`, companiesData);
+            
+            if (companiesData.length === 0) {
+              try {
+                console.log(`No companies found after filtering, fetching specific company with ID ${userCompanyId}`);
+                const specificCompanyResponse = await companyService.getCompanyById(userCompanyId);
+                if (specificCompanyResponse) {
+                  companiesData = [specificCompanyResponse];
+                  console.log('Fetched specific company:', specificCompanyResponse);
+                }
+              } catch (specificErr) {
+                console.error('Error fetching specific company:', specificErr);
+              }
+            }
+          }
+        }
+        
+        setCompanies(companiesData);
         setApiInfo({
           totalCount: response.totalCount,
           totalPage: response.totalPage
@@ -43,7 +70,7 @@ export default function CompanyList() {
     };
 
     fetchCompanies();
-  }, []);
+  }, [isCompanyRestricted, getUserCompanyId]);
 
   const getStatusBadge = (status: number) => {
     return status === 1 ? (
@@ -119,7 +146,9 @@ export default function CompanyList() {
         <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Tổng công ty</p>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                {isCompanyRestricted() ? "Công ty của bạn" : "Tổng công ty"}
+              </p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.totalCompanies}</p>
             </div>
             <div className="p-3 bg-blue-100 rounded-full dark:bg-blue-900/20">
@@ -133,7 +162,9 @@ export default function CompanyList() {
         <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Đang hoạt động</p>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                {isCompanyRestricted() ? "Trạng thái hoạt động" : "Đang hoạt động"}
+              </p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.activeCompanies}</p>
             </div>
             <div className="p-3 bg-green-100 rounded-full dark:bg-green-900/20">
@@ -147,7 +178,9 @@ export default function CompanyList() {
         <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Mới tháng này</p>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                {isCompanyRestricted() ? "Thông tin công ty" : "Mới tháng này"}
+              </p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.newThisMonth}</p>
             </div>
             <div className="p-3 bg-pink-100 rounded-full dark:bg-pink-900/20">
@@ -164,23 +197,39 @@ export default function CompanyList() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Danh sách công ty vận tải
+              {isCompanyRestricted() ? "Thông tin công ty của bạn" : "Danh sách công ty vận tải"}
             </h3>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              {apiInfo ? `Tổng số: ${apiInfo.totalCount} công ty (${apiInfo.totalPage} trang)` : `Tổng số: ${companies.length} công ty`}
+              {isCompanyRestricted() 
+                ? `Hiển thị thông tin công ty của bạn` 
+                : (apiInfo ? `Tổng số: ${apiInfo.totalCount} công ty (${apiInfo.totalPage} trang)` : `Tổng số: ${companies.length} công ty`)
+              }
             </p>
           </div>
           <div className="flex gap-2">
-            <button className="px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 text-sm font-medium">
-              Thêm công ty mới
-            </button>
+            {isAdmin() && (
+              <button className="px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 text-sm font-medium">
+                Thêm công ty mới
+              </button>
+            )}
             <button 
               onClick={() => {
                 setLoading(true);
                 setError(null);
                 companyService.getAllCompanies(1, 50)
                   .then(res => {
-                    setCompanies(res.data || []);
+                    let companiesData = res.data || [];
+                    
+                                         // Apply RBAC filtering for manager and staff
+                     if (isCompanyRestricted()) {
+                       const userCompanyId = getUserCompanyId();
+                       if (userCompanyId) {
+                         // Filter by company.id (not company.companyId) since user's companyId matches company.id
+                         companiesData = companiesData.filter(company => company.id === userCompanyId);
+                       }
+                     }
+                    
+                    setCompanies(companiesData);
                     setApiInfo({totalCount: res.totalCount, totalPage: res.totalPage});
                     setLoading(false);
                   })
@@ -240,7 +289,7 @@ export default function CompanyList() {
                         ) : null}
                         <div className={`h-12 w-12 rounded-lg bg-pink-100 flex items-center justify-center ${company.logo ? 'hidden' : ''}`}>
                           <span className="text-pink-600 font-semibold text-lg">
-                            {company.name.charAt(0)}
+                            {company.name?.charAt(0) || 'C'}
                           </span>
                         </div>
                       </div>

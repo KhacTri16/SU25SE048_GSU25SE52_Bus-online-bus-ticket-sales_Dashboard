@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Route, CreateRouteRequest, UpdateRouteRequest, Company } from "../../types/company";
 import { companyService } from "../../services/api";
+import { useAuth } from "../../context/AuthContext";
 
 interface RouteFormModalProps {
   isOpen: boolean;
@@ -11,6 +12,7 @@ interface RouteFormModalProps {
 }
 
 export default function RouteFormModal({ isOpen, onClose, onSubmit, route, title }: RouteFormModalProps) {
+  const { user, isAdmin, isCompanyRestricted, getUserCompanyId } = useAuth();
   const [formData, setFormData] = useState({
     routeId: '',
     fromLocation: '',
@@ -49,7 +51,25 @@ export default function RouteFormModal({ isOpen, onClose, onSubmit, route, title
     try {
       setLoading(true);
       const response = await companyService.getAllCompanies(1, 100);
-      setCompanies(response.data);
+      
+      // If user is company-restricted, filter companies to only show their company
+      let filteredCompanies = response.data;
+      if (isCompanyRestricted()) {
+        const userCompanyId = getUserCompanyId();
+        if (userCompanyId) {
+          filteredCompanies = response.data.filter(company => company.id === userCompanyId);
+          
+          // Auto-set company ID for company-restricted users
+          if (filteredCompanies.length > 0) {
+            setFormData(prev => ({
+              ...prev,
+              companyId: userCompanyId
+            }));
+          }
+        }
+      }
+      
+      setCompanies(filteredCompanies);
     } catch (error) {
       console.error('Error fetching companies:', error);
     } finally {
@@ -58,6 +78,7 @@ export default function RouteFormModal({ isOpen, onClose, onSubmit, route, title
   };
 
   const resetForm = () => {
+    const userCompanyId = getUserCompanyId();
     setFormData({
       routeId: '',
       fromLocation: '',
@@ -65,7 +86,7 @@ export default function RouteFormModal({ isOpen, onClose, onSubmit, route, title
       duration: 0,
       distance: 0,
       description: '',
-      companyId: 0,
+      companyId: isCompanyRestricted() && userCompanyId ? userCompanyId : 0,
     });
     setLicense(null);
     setErrors({});
@@ -168,28 +189,43 @@ export default function RouteFormModal({ isOpen, onClose, onSubmit, route, title
                 {errors.routeId && <p className="mt-1 text-sm text-red-500">{errors.routeId}</p>}
               </div>
 
-              {/* Công ty */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Công ty <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={formData.companyId}
-                  onChange={(e) => setFormData({ ...formData, companyId: parseInt(e.target.value) })}
-                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white ${
-                    errors.companyId ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                  disabled={loading}
-                >
-                  <option value={0}>Chọn công ty</option>
-                  {companies.map((company) => (
-                    <option key={company.id} value={company.id}>
-                      {company.name}
-                    </option>
-                  ))}
-                </select>
-                {errors.companyId && <p className="mt-1 text-sm text-red-500">{errors.companyId}</p>}
-              </div>
+              {/* Công ty - Only show for admin or if user is not company-restricted */}
+              {isAdmin() || !isCompanyRestricted() ? (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Công ty <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={formData.companyId}
+                    onChange={(e) => setFormData({ ...formData, companyId: parseInt(e.target.value) })}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white ${
+                      errors.companyId ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                    disabled={loading}
+                  >
+                    <option value={0}>Chọn công ty</option>
+                    {companies.map((company) => (
+                      <option key={company.id} value={company.id}>
+                        {company.name}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.companyId && <p className="mt-1 text-sm text-red-500">{errors.companyId}</p>}
+                </div>
+              ) : (
+                /* Show company info for company-restricted users */
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Công ty
+                  </label>
+                  <div className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300">
+                    {companies.length > 0 ? companies[0].name : 'Đang tải...'}
+                  </div>
+                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    Bạn chỉ có thể tạo tuyến đường cho công ty của mình
+                  </p>
+                </div>
+              )}
 
               {/* Điểm đi */}
               <div>

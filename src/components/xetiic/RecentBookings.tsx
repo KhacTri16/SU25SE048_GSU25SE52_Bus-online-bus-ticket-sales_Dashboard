@@ -87,7 +87,7 @@ export default function RecentBookings() {
               <div className="flex-shrink-0">
                 <div className="w-10 h-10 bg-pink-100 rounded-full flex items-center justify-center dark:bg-pink-900/20">
                   <span className="text-sm font-medium text-pink-600 dark:text-pink-400">
-                    {booking.customerName.charAt(0)}
+                    {booking.customerName?.charAt(0) || 'C'}
                   </span>
                 </div>
               </div>

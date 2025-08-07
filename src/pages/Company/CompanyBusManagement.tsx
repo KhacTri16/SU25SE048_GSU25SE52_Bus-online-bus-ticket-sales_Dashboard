@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { companyService, busService } from '../../services/api';
 import { Company, Bus } from '../../types/company';
+import { useAuth } from '../../context/AuthContext';
+import RoleAccessNotice from '../../components/common/RoleAccessNotice';
 
 const CompanyBusManagement: React.FC = () => {
+  const { user, isAdmin, isCompanyRestricted, getUserCompanyId, canAccessCompany } = useAuth();
   const [companies, setCompanies] = useState<Company[]>([]);
   const [buses, setBuses] = useState<Bus[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -30,8 +33,59 @@ const CompanyBusManagement: React.FC = () => {
       console.log('Buses response:', busesResponse);
       
       if (companiesResponse?.data && busesResponse?.data) {
-        setCompanies(companiesResponse.data);
-        setBuses(busesResponse.data);
+        let filteredCompanies = companiesResponse.data;
+        let filteredBuses = busesResponse.data;
+
+        // If user is company-restricted, filter data by their company
+        if (isCompanyRestricted()) {
+          const userCompanyId = getUserCompanyId();
+          console.log('User company ID:', userCompanyId);
+          
+          if (userCompanyId) {
+            // Filter companies to only show user's company
+            filteredCompanies = companiesResponse.data.filter(
+              company => company.id === userCompanyId
+            );
+            
+            // Get the user's company name for bus filtering
+            const userCompany = companiesResponse.data.find(
+              company => company.id === userCompanyId
+            );
+            
+            if (userCompany) {
+              // Filter buses to only show buses from user's company
+              filteredBuses = busesResponse.data.filter(
+                bus => bus.companyName === userCompany.name
+              );
+              
+              console.log('User company name:', userCompany.name);
+              console.log('Filtered companies:', filteredCompanies);
+              console.log('Filtered buses:', filteredBuses);
+              
+              if (filteredBuses.length === 0) {
+                try {
+                  console.log(`No buses found for company "${userCompany.name}", checking if there are any buses with this company name`);
+                  // This is a fallback - in a real scenario, you might want to add a getBusesByCompany API endpoint
+                  const allBuses = busesResponse.data;
+                  const companyBuses = allBuses.filter(bus => 
+                    bus.companyName.toLowerCase().includes(userCompany.name.toLowerCase()) ||
+                    userCompany.name.toLowerCase().includes(bus.companyName.toLowerCase())
+                  );
+                  
+                  if (companyBuses.length > 0) {
+                    filteredBuses = companyBuses;
+                    console.log('Found buses with partial company name match:', companyBuses);
+                  }
+                } catch (busErr) {
+                  console.error('Error in bus fallback filtering:', busErr);
+                }
+              }
+            }
+          }
+        }
+        
+        setCompanies(filteredCompanies);
+        setBuses(filteredBuses);
         setError(null);
       } else {
         console.warn('Invalid response structure');
@@ -121,12 +175,17 @@ const CompanyBusManagement: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Role-based access notice */}
+      <RoleAccessNotice className="mb-6" />
+
       {/* Statistics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Tổng công ty</p>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                {isCompanyRestricted() ? 'Công ty của bạn' : 'Tổng công ty'}
+              </p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.totalCompanies}</p>
             </div>
             <div className="p-3 bg-blue-100 rounded-full dark:bg-blue-900/20">
@@ -140,7 +199,9 @@ const CompanyBusManagement: React.FC = () => {
         <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Tổng xe</p>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                {isCompanyRestricted() ? 'Xe của công ty' : 'Tổng xe'}
+              </p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.totalBuses}</p>
             </div>
             <div className="p-3 bg-green-100 rounded-full dark:bg-green-900/20">
@@ -154,7 +215,9 @@ const CompanyBusManagement: React.FC = () => {
         <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Công ty hoạt động</p>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                {isCompanyRestricted() ? 'Trạng thái công ty' : 'Công ty hoạt động'}
+              </p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.activeCompanies}</p>
             </div>
             <div className="p-3 bg-pink-100 rounded-full dark:bg-pink-900/20">
@@ -166,97 +229,103 @@ const CompanyBusManagement: React.FC = () => {
         </div>
       </div>
 
-      {/* Company Selection */}
-      <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Chọn công ty để xem xe
-            </h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              Tổng số: {companies.length} công ty
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <button 
-              onClick={fetchData}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
-            >
-              🔄 Làm mới
-            </button>
-          </div>
-        </div>
-
-        {/* Search Box */}
-        <div className="mb-6">
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Tìm kiếm theo tên công ty..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:border-gray-700 dark:text-white"
-            />
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            </div>
-          </div>
-        </div>
-
-        {/* Company Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredCompanies.map((company) => {
-            const companyBuses = getBusesByCompany(company.name);
-            return (
-              <div
-                key={company.id}
-                className={`p-4 rounded-lg border cursor-pointer transition-all ${
-                  selectedCompany?.id === company.id
-                    ? 'border-pink-500 bg-pink-50 dark:bg-pink-900/20'
-                    : 'border-gray-200 hover:border-gray-300 dark:border-gray-700'
-                }`}
-                onClick={() => setSelectedCompany(company)}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="font-semibold text-gray-900 dark:text-white">
-                    {company.name}
-                  </h4>
-                  <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full dark:bg-blue-900/20 dark:text-blue-400">
-                    {companyBuses.length} xe
-                  </span>
-                </div>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
-                  ID: {company.companyId}
-                </p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {company.phone}
-                </p>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Bus List for Selected Company */}
-      {selectedCompany && (
+      {/* Company Selection - Only show for admin or if user has multiple companies */}
+      {isAdmin() || companies.length > 1 ? (
         <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
           <div className="flex items-center justify-between mb-6">
             <div>
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Xe của {selectedCompany.name}
+                {isAdmin() ? 'Chọn công ty để xem xe' : 'Công ty của bạn'}
               </h3>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                Tổng số: {getBusesByCompany(selectedCompany.name).length} xe
+                Tổng số: {companies.length} công ty
               </p>
             </div>
-            <button 
-              onClick={() => setSelectedCompany(null)}
-              className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 text-sm font-medium"
-            >
-              Đóng
-            </button>
+            <div className="flex gap-2">
+              <button 
+                onClick={fetchData}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
+              >
+                🔄 Làm mới
+              </button>
+            </div>
+          </div>
+
+          {/* Search Box - Only for admin */}
+          {isAdmin() && (
+            <div className="mb-6">
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Tìm kiếm theo tên công ty..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:border-gray-700 dark:text-white"
+                />
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Company Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredCompanies.map((company) => {
+              const companyBuses = getBusesByCompany(company.name);
+              return (
+                <div
+                  key={company.id}
+                  className={`p-4 rounded-lg border cursor-pointer transition-all ${
+                    selectedCompany?.id === company.id
+                      ? 'border-pink-500 bg-pink-50 dark:bg-pink-900/20'
+                      : 'border-gray-200 hover:border-gray-300 dark:border-gray-700'
+                  }`}
+                  onClick={() => setSelectedCompany(company)}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-semibold text-gray-900 dark:text-white">
+                      {company.name}
+                    </h4>
+                    <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full dark:bg-blue-900/20 dark:text-blue-400">
+                      {companyBuses.length} xe
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+                    ID: {company.companyId}
+                  </p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    {company.phone}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+
+      {/* Bus List for Selected Company or User's Company */}
+      {(selectedCompany || (isCompanyRestricted() && companies.length === 1)) && (
+        <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Xe của {selectedCompany?.name || companies[0]?.name}
+              </h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                Tổng số: {getBusesByCompany(selectedCompany?.name || companies[0]?.name).length} xe
+              </p>
+            </div>
+            {selectedCompany && (
+              <button 
+                onClick={() => setSelectedCompany(null)}
+                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 text-sm font-medium"
+              >
+                Đóng
+              </button>
+            )}
           </div>
 
           <div className="overflow-x-auto">
@@ -275,14 +344,14 @@ const CompanyBusManagement: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200 dark:bg-transparent dark:divide-gray-800">
-                {getBusesByCompany(selectedCompany.name).length === 0 ? (
+                {getBusesByCompany(selectedCompany?.name || companies[0]?.name).length === 0 ? (
                   <tr>
                     <td colSpan={3} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                       Không có xe nào cho công ty này
                     </td>
                   </tr>
                 ) : (
-                  getBusesByCompany(selectedCompany.name).map((bus) => (
+                  getBusesByCompany(selectedCompany?.name || companies[0]?.name).map((bus) => (
                     <tr key={bus.id} className="hover:bg-gray-50 dark:hover:bg-white/[0.02]">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">

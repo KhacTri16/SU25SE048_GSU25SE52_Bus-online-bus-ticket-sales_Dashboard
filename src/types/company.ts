@@ -153,6 +153,24 @@ export interface UpdateRoleRequest {
   permission: boolean;
 }
 
+export interface Location {
+  id: number;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+  timeTransit: number;
+  note: string;
+  isDeleted: boolean;
+}
+
+export interface LocationResponse {
+  data: Location[];
+  page: number;
+  amount: number;
+  totalPage: number;
+  totalCount: number;
+}
+
 export interface Bus {
   id: number;
   busId: string;

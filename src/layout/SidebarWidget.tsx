@@ -1,23 +1,46 @@
-export default function SidebarWidget() {
+import React from 'react';
+import { useAuth } from '../context/AuthContext';
+
+const SidebarWidget: React.FC = () => {
+  const { user, isAdmin, isManager, isStaff } = useAuth();
+
+  if (!user) return null;
+
+  const getRoleName = (roleId: number) => {
+    switch (roleId) {
+      case 1: return 'Admin';
+      case 2: return 'Manager';
+      case 3: return 'Staff';
+      default: return 'Unknown';
+    }
+  };
+
+  const getRoleColor = (roleId: number) => {
+    switch (roleId) {
+      case 1: return 'bg-red-500';
+      case 2: return 'bg-blue-500';
+      case 3: return 'bg-green-500';
+      default: return 'bg-gray-500';
+    }
+  };
+
   return (
-    <div
-      className={`
-        mx-auto mb-10 w-full max-w-60 rounded-2xl bg-pink-50 px-4 py-5 text-center dark:bg-pink-900/10`}
-    >
-      <h3 className="mb-2 font-semibold text-gray-900 dark:text-white">
-        🚌 XeTiic System
-      </h3>
-      <p className="mb-4 text-gray-500 text-theme-sm dark:text-gray-400">
-        Hệ thống quản lý bán vé xe khách hiện đại và thông minh.
-      </p>
-      <a
-        href="#"
-        target="_blank"
-        rel="nofollow"
-        className="flex items-center justify-center p-3 font-medium text-white rounded-lg bg-pink-600 text-theme-sm hover:bg-pink-700"
-      >
-        Liên hệ hỗ trợ
-      </a>
+    <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+      <div className="flex items-center space-x-3">
+        <div className={`w-8 h-8 rounded-full ${getRoleColor(user.roleId)} flex items-center justify-center text-white text-sm font-bold`}>
+          {user.fullName?.charAt(0) || 'U'}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+            {user.fullName}
+          </p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            {getRoleName(user.roleId)}
+          </p>
+        </div>
+      </div>
     </div>
   );
-}
+};
+
+export default SidebarWidget;

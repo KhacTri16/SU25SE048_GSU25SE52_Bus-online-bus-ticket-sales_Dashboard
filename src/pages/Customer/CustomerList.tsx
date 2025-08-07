@@ -248,7 +248,7 @@ const CustomerList: React.FC = () => {
                         <div className="flex-shrink-0 h-12 w-12">
                           <div className="h-12 w-12 rounded-lg bg-pink-100 flex items-center justify-center dark:bg-pink-900/20">
                             <span className="text-pink-600 dark:text-pink-400 font-semibold text-lg">
-                              {customer.customerName.charAt(0)}
+                              {customer.customerName?.charAt(0) || 'C'}
                             </span>
                           </div>
                         </div>

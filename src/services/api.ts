@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { CompanyResponse, RouteResponse, CreateRouteRequest, UpdateRouteRequest, Customer, CustomerResponse, StationResponse, CreateStationRequest, UpdateStationRequest, Station, RoleResponse, CreateRoleRequest, UpdateRoleRequest, Role, BusResponse } from '../types/company';
+import { CompanyResponse, RouteResponse, CreateRouteRequest, UpdateRouteRequest, Customer, CustomerResponse, StationResponse, CreateStationRequest, UpdateStationRequest, Station, RoleResponse, CreateRoleRequest, UpdateRoleRequest, Role, BusResponse, LocationResponse, Company } from '../types/company';
 
 const baseURL = 'https://bobts-server-e7dxfwh7e5g9e3ad.malaysiawest-01.azurewebsites.net';
 
@@ -54,6 +54,16 @@ export const companyService = {
       return response.data;
     } catch (error) {
       console.error('Error fetching companies:', error);
+      throw error;
+    }
+  },
+
+  async getCompanyById(id: number): Promise<Company> {
+    try {
+      const response = await api.get<Company>(`/api/Company/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching company by ID:', error);
       throw error;
     }
   },
@@ -281,6 +291,22 @@ export const busService = {
   },
 };
 
+export const locationService = {
+  async getAllLocations(): Promise<LocationResponse> {
+    try {
+      const response = await api.get<LocationResponse>('/api/Location', {
+        params: {
+          All: true
+        }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching locations:', error);
+      throw error;
+    }
+  },
+};
+
 // Auth Service
 export interface LoginRequest {
   email: string;
@@ -317,6 +343,72 @@ export interface RefreshTokenRequest {
   refreshToken: string;
 }
 
+export interface SystemUser {
+  id: number;
+  systemId: string;
+  email: string;
+  fullName: string;
+  phone: string;
+  address: string;
+  companyId: number;
+  password: string;
+  avartar: string;
+  isActive: boolean;
+  isDeleted: boolean;
+  roleId: number;
+}
+
+export interface SystemUserLoginResponse {
+  token: string;
+  systemUser: SystemUser;
+}
+
+export interface SystemUserResponse {
+  data: SystemUser[];
+  page: number;
+  amount: number;
+  totalPage: number;
+  totalCount: number;
+}
+
+export interface RolePermissions {
+  [roleId: number]: string[];
+}
+
+export const ROLE_PERMISSIONS: RolePermissions = {
+  1: [ // Admin - Full access
+    'dashboard.read',
+    'company.read', 'company.write', 'company.delete',
+    'routes.read', 'routes.write', 'routes.delete',
+    'stations.read', 'stations.write', 'stations.delete',
+    'locations.read', 'locations.write', 'locations.delete',
+    'customers.read', 'customers.write', 'customers.delete',
+    'buses.read', 'buses.write', 'buses.delete',
+    'roles.read', 'roles.write', 'roles.delete',
+    'users.read', 'users.write', 'users.delete',
+    'reports.read', 'reports.write',
+    'settings.read', 'settings.write'
+  ],
+  2: [ // Manager - Company-specific access
+    'dashboard.read',
+    'company.read',
+    'routes.read', 'routes.write',
+    'stations.read', 'stations.write',
+    'locations.read', 'locations.write',
+    'customers.read', 'customers.write',
+    'buses.read', 'buses.write',
+    'reports.read'
+  ],
+  3: [ // Staff - Limited access
+    'dashboard.read',
+    'routes.read',
+    'stations.read',
+    'locations.read',
+    'customers.read', 'customers.write',
+    'buses.read'
+  ]
+};
+
 export const authService = {
   login: (credentials: LoginRequest): Promise<AuthResponse> => api.post('/auth/login', credentials),
   register: (data: RegisterRequest): Promise<AuthResponse> => api.post('/auth/register', data),
@@ -330,6 +422,64 @@ export const authService = {
   getProfile: (): Promise<AuthResponse['user']> => api.get('/auth/profile'),
   updateProfile: (data: Partial<AuthResponse['user']>): Promise<AuthResponse['user']> => 
     api.put('/auth/profile', data),
+  loginSystemUser: (credentials: { email: string; password: string }): Promise<SystemUserLoginResponse> =>
+    api.post('/api/SystemUser/login', credentials).then(res => res.data),
+};
+
+export const systemUserService = {
+  async getAllUsers(): Promise<SystemUserResponse> {
+    try {
+      const response = await api.get<SystemUserResponse>('/api/SystemUser', {
+        params: {
+          All: true
+        }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching system users:', error);
+      throw error;
+    }
+  },
+
+  async getUserById(id: number): Promise<SystemUser> {
+    try {
+      const response = await api.get<SystemUser>(`/api/SystemUser/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching system user by id:', error);
+      throw error;
+    }
+  },
+
+  async createUser(userData: Omit<SystemUser, 'id'>): Promise<any> {
+    try {
+      const response = await api.post('/api/SystemUser', userData);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating system user:', error);
+      throw error;
+    }
+  },
+
+  async updateUser(id: number, userData: Partial<SystemUser>): Promise<any> {
+    try {
+      const response = await api.put(`/api/SystemUser/${id}`, userData);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating system user:', error);
+      throw error;
+    }
+  },
+
+  async deleteUser(id: number): Promise<any> {
+    try {
+      const response = await api.delete(`/api/SystemUser/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error deleting system user:', error);
+      throw error;
+    }
+  }
 };
 
 export default api;
