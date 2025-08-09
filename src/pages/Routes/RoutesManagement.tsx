@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Route, CreateRouteRequest, UpdateRouteRequest } from "../../types/company";
-import { routeService } from "../../services/api";
+import { routeService, companyService } from "../../services/api";
 import PageMeta from "../../components/common/PageMeta";
 import RouteFormModal from "../../components/Routes/RouteFormModal";
 import DeleteConfirmModal from "../../components/Routes/DeleteConfirmModal";
@@ -8,7 +8,7 @@ import { useAuth } from "../../context/AuthContext";
 import RoleAccessNotice from "../../components/common/RoleAccessNotice";
 
 export default function RoutesManagement() {
-  const { user, isAdmin, isCompanyRestricted, getUserCompanyId, canAccessCompany } = useAuth();
+  const { user, isAdmin, isCompanyRestricted, getUserCompanyId } = useAuth();
   const [routes, setRoutes] = useState<Route[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -42,10 +42,38 @@ export default function RoutesManagement() {
       if (isCompanyRestricted()) {
         const userCompanyId = getUserCompanyId();
         if (userCompanyId) {
-          // Since Route doesn't have companyId, we need to get company name from user's company
-          // For now, we'll show all routes and let the backend handle filtering
-          // This is a temporary solution until we have companyId in Route interface
-          console.log('Company-restricted user, showing all routes (backend should filter)');
+          // Get user's company name for route filtering
+          try {
+            const companiesResponse = await companyService.getAllCompanies(1, 100);
+            const userCompany = companiesResponse.data.find(
+              company => company.id === userCompanyId
+            );
+            
+            if (userCompany) {
+              // Filter routes to only show routes from user's company
+              filteredRoutes = response.data.filter(
+                route => route.companyName === userCompany.name
+              );
+              
+              // Fallback: partial name matching if exact match fails
+              if (filteredRoutes.length === 0) {
+                const companyRoutes = response.data.filter(route => 
+                  route.companyName.toLowerCase().includes(userCompany.name.toLowerCase()) ||
+                  userCompany.name.toLowerCase().includes(route.companyName.toLowerCase())
+                );
+                
+                if (companyRoutes.length > 0) {
+                  filteredRoutes = companyRoutes;
+                }
+              }
+              
+              console.log(`Filtered routes for user companyId ${userCompanyId}:`, filteredRoutes);
+            }
+          } catch (companyError) {
+            console.error('Error fetching companies for filtering:', companyError);
+            // If we can't fetch companies, show all routes (backend should handle filtering)
+            console.log('Showing all routes (backend should filter)');
+          }
         }
       }
       
@@ -212,10 +240,13 @@ export default function RoutesManagement() {
 
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          Quản lý tuyến đường
+          {isCompanyRestricted() ? 'Tuyến đường của công ty' : 'Quản lý tuyến đường'}
         </h1>
         <p className="text-gray-600 dark:text-gray-400 mt-1">
-          Danh sách và quản lý các tuyến đường xe khách
+          {isCompanyRestricted() 
+            ? 'Danh sách và quản lý các tuyến đường của công ty bạn'
+            : 'Danh sách và quản lý các tuyến đường xe khách'
+          }
         </p>
       </div>
 
@@ -338,9 +369,11 @@ export default function RoutesManagement() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">
                   Thời gian
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">
-                  Công ty
-                </th>
+                {!isCompanyRestricted() && (
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">
+                    Công ty
+                  </th>
+                )}
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">
                   Ngày tạo
                 </th>
@@ -376,11 +409,13 @@ export default function RoutesManagement() {
                       {formatDuration(route.duration)}
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900 dark:text-white">
-                      {route.companyName}
-                    </div>
-                  </td>
+                  {!isCompanyRestricted() && (
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900 dark:text-white">
+                        {route.companyName}
+                      </div>
+                    </td>
+                  )}
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-500 dark:text-gray-400">
                       {formatDate(route.createAt)}

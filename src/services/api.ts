@@ -12,7 +12,6 @@ const api = axios.create({
   },
 });
 
-// Add request interceptor for debugging
 api.interceptors.request.use(
   (config) => {
     console.log('API Request:', config.method?.toUpperCase(), config.url, config.params);
@@ -24,7 +23,6 @@ api.interceptors.request.use(
   }
 );
 
-// Add response interceptor for debugging
 api.interceptors.response.use(
   (response) => {
     console.log('API Response:', response.status, response.data);
@@ -451,9 +449,35 @@ export const systemUserService = {
     }
   },
 
-  async createUser(userData: Omit<SystemUser, 'id'>): Promise<any> {
+  async createUser(userData: {
+    Email: string;
+    FullName: string;
+    Phone: string;
+    Address: string;
+    CompanyId: number;
+    Password: string;
+    Role: number;
+    Avartar?: File;
+  }): Promise<any> {
     try {
-      const response = await api.post('/api/SystemUser', userData);
+      const formData = new FormData();
+      formData.append('Email', userData.Email);
+      formData.append('FullName', userData.FullName);
+      formData.append('Phone', userData.Phone);
+      formData.append('Address', userData.Address);
+      formData.append('CompanyId', userData.CompanyId.toString());
+      formData.append('Password', userData.Password);
+      formData.append('Role', userData.Role.toString());
+      
+      if (userData.Avartar) {
+        formData.append('Avartar', userData.Avartar);
+      }
+
+      const response = await api.post('/api/SystemUser', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
       return response.data;
     } catch (error) {
       console.error('Error creating system user:', error);

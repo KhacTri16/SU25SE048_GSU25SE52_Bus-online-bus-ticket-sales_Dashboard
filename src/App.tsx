@@ -24,6 +24,7 @@ import XeTiicDashboard from "./pages/Dashboard/XeTiicDashboard";
 import { CompanyPage, CompanyBusManagement } from "./pages/Company";
 import RoutesManagement from "./pages/Routes/RoutesManagement";
 import { CustomerList } from "./pages/Customer";
+import UserManagement from "./pages/User/UserManagement";
 
 import { LocationList } from "./pages/Location";
 import { RoleManagement } from "./pages/Role";
@@ -119,6 +120,11 @@ export default function App() {
 
                           {/* Role Management */}
                           <Route path="roles" element={<RoleManagement />} />
+
+                          {/* User Management */}
+                          <Route path="users" element={<UserManagement />} />
+                          
+
 
                           {/* Others Page */}
                           <Route path="profile" element={<UserProfiles />} />

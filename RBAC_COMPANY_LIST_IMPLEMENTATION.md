@@ -30,10 +30,8 @@ This document outlines the Role-Based Access Control (RBAC) implementation for t
 if (isCompanyRestricted()) {
   const userCompanyId = getUserCompanyId();
   if (userCompanyId) {
-    // Filter by company.id (not company.companyId) since user's companyId matches company.id
     companiesData = companiesData.filter(company => company.id === userCompanyId);
     
-    // If no companies found after filtering, try to fetch the specific company
     if (companiesData.length === 0) {
       const specificCompanyResponse = await companyService.getCompanyById(userCompanyId);
       if (specificCompanyResponse) {

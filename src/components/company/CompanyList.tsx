@@ -27,7 +27,6 @@ export default function CompanyList() {
         if (isCompanyRestricted()) {
           const userCompanyId = getUserCompanyId();
           if (userCompanyId) {
-            // Filter by company.id (not company.companyId) since user's companyId matches company.id
             companiesData = companiesData.filter(company => company.id === userCompanyId);
             console.log(`Filtered companies for user companyId ${userCompanyId}:`, companiesData);
             
