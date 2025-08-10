@@ -5,13 +5,18 @@ import { useAuth } from '../../context/AuthContext';
 import RoleAccessNotice from '../../components/common/RoleAccessNotice';
 
 const CompanyBusManagement: React.FC = () => {
-  const { user, isAdmin, isCompanyRestricted, getUserCompanyId, canAccessCompany } = useAuth();
+  const { isAdmin, isManager, isCompanyRestricted, getUserCompanyId } = useAuth();
   const [companies, setCompanies] = useState<Company[]>([]);
   const [buses, setBuses] = useState<Bus[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editingBus, setEditingBus] = useState<Bus | null>(null);
+  const [formData, setFormData] = useState({ name: '', numberPlate: '', typeBusId: 0, companyId: 0 });
+  const [submitting, setSubmitting] = useState(false);
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -111,16 +116,80 @@ const CompanyBusManagement: React.FC = () => {
     }
   };
 
+  const showToast = (message: string, type: 'success' | 'error') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 4000);
+  };
+
+  const openCreateBus = (company: Company) => {
+    if (!isManager()) return;
+    setEditingBus(null);
+    setFormData({ name: '', numberPlate: '', typeBusId: 0, companyId: company.id });
+    setIsFormOpen(true);
+  };
+
+  const openEditBus = (bus: Bus, companyId: number) => {
+    if (!isManager()) return;
+    setEditingBus(bus);
+    setFormData({ name: bus.name, numberPlate: bus.numberPlate, typeBusId: bus.typeBusId, companyId });
+    setIsFormOpen(true);
+  };
+
+  const closeForm = () => {
+    setIsFormOpen(false);
+    setEditingBus(null);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isManager()) return;
+    try {
+      setSubmitting(true);
+      const userCompanyId = getUserCompanyId();
+      if (!userCompanyId || userCompanyId !== formData.companyId) {
+        showToast('Bạn chỉ có thể quản lý xe của công ty mình.', 'error');
+        return;
+      }
+      if (editingBus) {
+        await busService.updateBus(editingBus.id, formData);
+        showToast('Cập nhật xe thành công!', 'success');
+      } else {
+        await busService.createBus(formData);
+        showToast('Thêm xe thành công!', 'success');
+      }
+      await fetchData();
+      closeForm();
+    } catch (err) {
+      console.error(err);
+      showToast('Không thể lưu xe. Vui lòng thử lại.', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (bus: Bus, companyId: number) => {
+    if (!isManager()) return;
+    try {
+      const userCompanyId = getUserCompanyId();
+      if (!userCompanyId || userCompanyId !== companyId) {
+        showToast('Bạn chỉ có thể xóa xe của công ty mình.', 'error');
+        return;
+      }
+      await busService.deleteBus(bus.id);
+      showToast('Xóa xe thành công!', 'success');
+      await fetchData();
+    } catch (err) {
+      console.error(err);
+      showToast('Không thể xóa xe. Vui lòng thử lại.', 'error');
+    }
+  };
+
   // Filter buses by selected company
   const getBusesByCompany = (companyId: string) => {
     return buses.filter(bus => bus.companyName === companyId);
   };
 
-  // Get all unique company names from buses
-  const getCompanyNamesFromBuses = () => {
-    const companyNames = [...new Set(buses.map(bus => bus.companyName))];
-    return companyNames;
-  };
+  // (unused) Get all unique company names from buses
 
   const filteredCompanies = companies.filter(company =>
     company.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -299,6 +368,16 @@ const CompanyBusManagement: React.FC = () => {
                   <p className="text-sm text-gray-500 dark:text-gray-400">
                     {company.phone}
                   </p>
+                  {isManager() && getUserCompanyId() === company.id && (
+                    <div className="mt-3">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); openCreateBus(company); }}
+                        className="px-3 py-1.5 text-xs font-medium rounded bg-green-600 text-white hover:bg-green-700"
+                      >
+                        + Thêm xe cho công ty này
+                      </button>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -318,14 +397,28 @@ const CompanyBusManagement: React.FC = () => {
                 Tổng số: {getBusesByCompany(selectedCompany?.name || companies[0]?.name).length} xe
               </p>
             </div>
-            {selectedCompany && (
-              <button 
-                onClick={() => setSelectedCompany(null)}
-                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 text-sm font-medium"
-              >
-                Đóng
-              </button>
-            )}
+            <div className="flex items-center gap-2">
+              {/* Manager add bus button for their own company */}
+              {(() => {
+                const currentCompany = selectedCompany || companies[0];
+                return isManager() && currentCompany && getUserCompanyId() === currentCompany.id;
+              })() && (
+                <button
+                  onClick={() => openCreateBus(selectedCompany || (companies[0] as Company))}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium"
+                >
+                  + Thêm xe
+                </button>
+              )}
+              {selectedCompany && (
+                <button 
+                  onClick={() => setSelectedCompany(null)}
+                  className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 text-sm font-medium"
+                >
+                  Đóng
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="overflow-x-auto">
@@ -381,18 +474,95 @@ const CompanyBusManagement: React.FC = () => {
                         <button className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 mr-3">
                           Xem
                         </button>
-                        <button className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300 mr-3">
-                          Sửa
-                        </button>
-                        <button className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300">
-                          Xóa
-                        </button>
+                        {isManager() && getUserCompanyId() === (selectedCompany?.id || companies[0]?.id) && (
+                          <>
+                            <button
+                              onClick={() => openEditBus(bus, selectedCompany?.id || companies[0]?.id)}
+                              className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300 mr-3"
+                            >
+                              Sửa
+                            </button>
+                            <button
+                              onClick={() => handleDelete(bus, selectedCompany?.id || companies[0]?.id)}
+                              className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+                            >
+                              Xóa
+                            </button>
+                          </>
+                        )}
                       </td>
                     </tr>
                   ))
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+      {/* Manager Bus Form Modal */}
+      {isFormOpen && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex min-h-screen items-center justify-center p-4">
+            <div className="fixed inset-0 bg-black bg-opacity-50" onClick={closeForm}></div>
+            <div className="relative w-full max-w-lg bg-white dark:bg-gray-900 rounded-lg shadow-xl p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {editingBus ? 'Cập nhật xe' : 'Thêm xe mới'}
+                </h3>
+                <button onClick={closeForm} className="text-gray-400 hover:text-gray-600">✕</button>
+              </div>
+              {toast && (
+                <div className={`mb-3 rounded p-2 text-sm ${toast.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>{toast.message}</div>
+              )}
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Tên xe<span className="text-red-500">*</span></label>
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="w-full px-3 py-2 border rounded dark:bg-gray-800 dark:border-gray-700"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Biển số<span className="text-red-500">*</span></label>
+                  <input
+                    type="text"
+                    value={formData.numberPlate}
+                    onChange={(e) => setFormData({ ...formData, numberPlate: e.target.value })}
+                    className="w-full px-3 py-2 border rounded dark:bg-gray-800 dark:border-gray-700"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Loại xe (typeBusId)<span className="text-red-500">*</span></label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={formData.typeBusId}
+                    onChange={(e) => setFormData({ ...formData, typeBusId: parseInt(e.target.value) || 0 })}
+                    className="w-full px-3 py-2 border rounded dark:bg-gray-800 dark:border-gray-700"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Công ty</label>
+                  <input
+                    type="text"
+                    value={(selectedCompany?.name || companies[0]?.name) + ` (#${formData.companyId})`}
+                    disabled
+                    className="w-full px-3 py-2 border rounded bg-gray-100 dark:bg-gray-800 dark:border-gray-700"
+                  />
+                </div>
+                <div className="flex justify-end gap-2 pt-2">
+                  <button type="button" onClick={closeForm} className="px-4 py-2 rounded border">Hủy</button>
+                  <button type="submit" disabled={submitting} className="px-4 py-2 rounded bg-pink-600 text-white disabled:opacity-60">
+                    {submitting ? 'Đang lưu...' : (editingBus ? 'Cập nhật' : 'Tạo mới')}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       )}

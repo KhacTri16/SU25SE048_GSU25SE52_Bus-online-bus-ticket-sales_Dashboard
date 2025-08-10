@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { locationService, stationService } from '../../services/api';
-import { Location, Station } from '../../types/company';
+import { Location, Station, CreateStationRequest, UpdateStationRequest } from '../../types/company';
+import { useAuth } from '../../context/AuthContext';
+import StationFormModal from '../../components/Station/StationFormModal';
+import DeleteConfirmModal from '../../components/Station/DeleteConfirmModal';
+import RoleAccessNotice from '../../components/common/RoleAccessNotice';
 
 const LocationList: React.FC = () => {
   const [locations, setLocations] = useState<Location[]>([]);
@@ -9,6 +13,15 @@ const LocationList: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [expandedLocation, setExpandedLocation] = useState<number | null>(null);
+  const { isAdmin } = useAuth();
+
+  // Station CRUD modals
+  const [isFormModalOpen, setIsFormModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [selectedStation, setSelectedStation] = useState<Station | null>(null);
+  const [defaultLocationId, setDefaultLocationId] = useState<number>(0);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -48,6 +61,76 @@ const LocationList: React.FC = () => {
       setError(errorMessage);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const showToast = (message: string, type: 'success' | 'error') => {
+    setToast({ type, message });
+    setTimeout(() => setToast(null), 4000);
+  };
+
+  const openCreateStation = (locationId: number) => {
+    if (!isAdmin()) return;
+    setDefaultLocationId(locationId);
+    setSelectedStation(null);
+    setIsFormModalOpen(true);
+  };
+
+  const openEditStation = (station: Station) => {
+    if (!isAdmin()) return;
+    setSelectedStation(station);
+    setDefaultLocationId(station.locationId || 0);
+    setIsFormModalOpen(true);
+  };
+
+  const openDeleteStation = (station: Station) => {
+    if (!isAdmin()) return;
+    setSelectedStation(station);
+    setIsDeleteModalOpen(true);
+  };
+
+  const closeModals = () => {
+    setIsFormModalOpen(false);
+    setIsDeleteModalOpen(false);
+    setSelectedStation(null);
+  };
+
+  const handleCreateStation = async (data: CreateStationRequest) => {
+    if (!isAdmin()) return;
+    try {
+      await stationService.createStation(data);
+      showToast('Tạo trạm xe thành công!', 'success');
+      await fetchData();
+    } catch (e) {
+      showToast('Không thể tạo trạm xe. Vui lòng thử lại.', 'error');
+      throw e;
+    }
+  };
+
+  const handleUpdateStation = async (data: UpdateStationRequest) => {
+    if (!isAdmin() || !selectedStation) return;
+    try {
+      await stationService.updateStation(selectedStation.id, data);
+      showToast('Cập nhật trạm xe thành công!', 'success');
+      await fetchData();
+    } catch (e) {
+      showToast('Không thể cập nhật trạm xe. Vui lòng thử lại.', 'error');
+      throw e;
+    }
+  };
+
+  const handleDeleteStation = async () => {
+    if (!isAdmin() || !selectedStation) return;
+    try {
+      setIsDeleting(true);
+      await stationService.deleteStation(selectedStation.id);
+      showToast('Xóa trạm xe thành công!', 'success');
+      closeModals();
+      await fetchData();
+    } catch (e) {
+      showToast('Không thể xóa trạm xe. Vui lòng thử lại.', 'error');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -94,6 +177,12 @@ const LocationList: React.FC = () => {
 
   return (
     <div className="p-6 bg-gray-50 dark:bg-gray-900 min-h-screen">
+      <RoleAccessNotice className="mb-4" />
+      {toast && (
+        <div className={`mb-4 rounded-md p-3 ${toast.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+          {toast.message}
+        </div>
+      )}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Quản lý Địa điểm</h1>
         <p className="text-gray-600 dark:text-gray-400">Xem danh sách địa điểm và các trạm xe tương ứng</p>
@@ -229,14 +318,24 @@ const LocationList: React.FC = () => {
                   {isExpanded && (
                     <div className="mt-4 ml-12">
                       <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
-                        <h4 className="text-md font-semibold text-gray-900 dark:text-white mb-3">Danh sách trạm xe tại {location.name}</h4>
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="text-md font-semibold text-gray-900 dark:text-white">Danh sách trạm xe tại {location.name}</h4>
+                          {isAdmin() && (
+                            <button
+                              onClick={() => openCreateStation(location.id)}
+                              className="px-3 py-1.5 text-sm font-medium text-white bg-pink-600 rounded hover:bg-pink-700"
+                            >
+                              + Thêm trạm tại địa điểm này
+                            </button>
+                          )}
+                        </div>
                         {locationStations.length === 0 ? (
                           <p className="text-gray-500 dark:text-gray-400 text-sm">Chưa có trạm xe nào tại địa điểm này.</p>
                         ) : (
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                             {locationStations.map((station) => (
                               <div key={station.id} className="bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-600">
-                                <div className="flex items-center space-x-2">
+                                <div className="flex items-center justify-between space-x-2">
                                   <div className="w-6 h-6 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
                                     <svg className="w-3 h-3 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
@@ -246,6 +345,22 @@ const LocationList: React.FC = () => {
                                     <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{station.name}</p>
                                     <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{station.stationId}</p>
                                   </div>
+                                  {isAdmin() && (
+                                    <div className="flex items-center gap-2">
+                                      <button
+                                        onClick={() => openEditStation(station)}
+                                        className="text-xs text-green-600 hover:text-green-700"
+                                      >
+                                        Sửa
+                                      </button>
+                                      <button
+                                        onClick={() => openDeleteStation(station)}
+                                        className="text-xs text-red-600 hover:text-red-700"
+                                      >
+                                        Xóa
+                                      </button>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             ))}
@@ -260,6 +375,24 @@ const LocationList: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Station Modals */}
+      <StationFormModal
+        isOpen={isFormModalOpen}
+        onClose={closeModals}
+        onSubmit={selectedStation ? handleUpdateStation : handleCreateStation}
+        station={selectedStation}
+        title={selectedStation ? 'Chỉnh sửa trạm xe' : 'Thêm trạm xe mới'}
+        defaultLocationId={defaultLocationId}
+        lockLocation={!selectedStation}
+      />
+      <DeleteConfirmModal
+        isOpen={isDeleteModalOpen}
+        onClose={closeModals}
+        onConfirm={handleDeleteStation}
+        station={selectedStation}
+        isDeleting={isDeleting}
+      />
     </div>
   );
 };

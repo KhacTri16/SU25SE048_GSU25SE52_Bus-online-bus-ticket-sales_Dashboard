@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { CompanyResponse, RouteResponse, CreateRouteRequest, UpdateRouteRequest, Customer, CustomerResponse, StationResponse, CreateStationRequest, UpdateStationRequest, Station, RoleResponse, CreateRoleRequest, UpdateRoleRequest, Role, BusResponse, LocationResponse, Company } from '../types/company';
+import { CompanyResponse, RouteResponse, CreateRouteRequest, UpdateRouteRequest, Customer, StationResponse, CreateStationRequest, UpdateStationRequest, Station, RoleResponse, CreateRoleRequest, UpdateRoleRequest, Role, BusResponse, LocationResponse, Company } from '../types/company';
 
 const baseURL = 'https://bobts-server-e7dxfwh7e5g9e3ad.malaysiawest-01.azurewebsites.net';
 
@@ -14,6 +14,12 @@ const api = axios.create({
 
 api.interceptors.request.use(
   (config) => {
+    // Attach auth token if available
+    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+    if (token) {
+      config.headers = config.headers || {};
+      (config.headers as any)['Authorization'] = `Bearer ${token}`;
+    }
     console.log('API Request:', config.method?.toUpperCase(), config.url, config.params);
     return config;
   },
@@ -287,6 +293,46 @@ export const busService = {
       throw error;
     }
   },
+
+  async getBusById(id: number): Promise<any> {
+    try {
+      const response = await api.get(`/api/Bus/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching bus by id:', error);
+      throw error;
+    }
+  },
+
+  async createBus(busData: { name: string; numberPlate: string; typeBusId: number; companyId: number }): Promise<any> {
+    try {
+      const response = await api.post('/api/Bus', busData);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating bus:', error);
+      throw error;
+    }
+  },
+
+  async updateBus(id: number, busData: { name: string; numberPlate: string; typeBusId: number; companyId: number }): Promise<any> {
+    try {
+      const response = await api.put(`/api/Bus/${id}`, busData);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating bus:', error);
+      throw error;
+    }
+  },
+
+  async deleteBus(id: number): Promise<any> {
+    try {
+      const response = await api.delete(`/api/Bus/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error deleting bus:', error);
+      throw error;
+    }
+  },
 };
 
 export const locationService = {
@@ -403,7 +449,19 @@ export const ROLE_PERMISSIONS: RolePermissions = {
     'stations.read',
     'locations.read',
     'customers.read', 'customers.write',
-    'buses.read'
+    'buses.read',
+    // Allow staff to view reports per requirement
+    'reports.read'
+  ],
+  4: [ // Driver - Read-only company data
+    'dashboard.read',
+    'routes.read',
+    'reports.read'
+  ],
+  5: [ // Seller - Read-only company data
+    'dashboard.read',
+    'routes.read',
+    'reports.read'
   ]
 };
 
@@ -422,6 +480,34 @@ export const authService = {
     api.put('/auth/profile', data),
   loginSystemUser: (credentials: { email: string; password: string }): Promise<SystemUserLoginResponse> =>
     api.post('/api/SystemUser/login', credentials).then(res => res.data),
+};
+
+// Payment/Revenue Service
+export interface MonthlyRevenueResponse {
+  companyId: number;
+  year: number;
+  month: number;
+  revenue: number;
+}
+
+export const paymentService = {
+  async getCompanyTotalRevenue(companyId: number): Promise<number> {
+    const response = await api.get<number>(`/api/Payment/company/revenue/total`, {
+      params: { companyId },
+    });
+    return response.data as unknown as number;
+  },
+
+  async getMonthlyRevenue(
+    companyId: number,
+    year: number,
+    month: number
+  ): Promise<MonthlyRevenueResponse> {
+    const response = await api.get<MonthlyRevenueResponse>(
+      `/Payment/monthly-revenue/${companyId}/${year}/${month}`
+    );
+    return response.data;
+  },
 };
 
 export const systemUserService = {

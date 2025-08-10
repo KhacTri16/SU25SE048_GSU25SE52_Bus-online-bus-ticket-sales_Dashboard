@@ -28,10 +28,10 @@ import UserManagement from "./pages/User/UserManagement";
 
 import { LocationList } from "./pages/Location";
 import { RoleManagement } from "./pages/Role";
-import { BusManagement } from "./pages/Bus";
 import DarkModeDemo from "./components/demo/DarkModeDemo";
 import AuthGuard from "./components/auth/AuthGuard";
 import { Component, ReactNode } from "react";
+import RevenueReport from "./pages/Reports/RevenueReport";
 
 // Error Boundary Component
 class ErrorBoundary extends Component<
@@ -106,8 +106,7 @@ export default function App() {
                           {/* Routes Management */}
                           <Route path="routes" element={<RoutesManagement />} />
 
-                          {/* Bus Management */}
-                          <Route path="schedule" element={<BusManagement />} />
+                          {/* Bus Management moved under company; schedule route removed */}
 
                           {/* Customer Management */}
                           <Route path="customers" element={<CustomerList />} />
@@ -148,6 +147,16 @@ export default function App() {
                           {/* Charts */}
                           <Route path="line-chart" element={<LineChart />} />
                           <Route path="bar-chart" element={<BarChart />} />
+
+                          {/* Reports */}
+                          <Route
+                            path="reports/revenue"
+                            element={
+                              <AuthGuard requiredPermission="reports.read">
+                                <RevenueReport />
+                              </AuthGuard>
+                            }
+                          />
 
                           {/* Fallback Route for protected area */}
                           <Route path="*" element={<NotFound />} />

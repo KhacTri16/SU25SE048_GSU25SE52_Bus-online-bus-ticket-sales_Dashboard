@@ -8,7 +8,7 @@ import { useAuth } from "../../context/AuthContext";
 import RoleAccessNotice from "../../components/common/RoleAccessNotice";
 
 export default function RoutesManagement() {
-  const { user, isAdmin, isCompanyRestricted, getUserCompanyId } = useAuth();
+  const { isManager, isCompanyRestricted, getUserCompanyId } = useAuth();
   const [routes, setRoutes] = useState<Route[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -106,6 +106,11 @@ export default function RoutesManagement() {
 
   const handleCreateRoute = async (data: CreateRouteRequest) => {
     try {
+      // Only Manager can create
+      if (!isManager()) {
+        showMessage('Chỉ Manager mới có quyền tạo tuyến đường.', 'error');
+        return;
+      }
       // If user is company-restricted, automatically set their company ID
       if (isCompanyRestricted()) {
         const userCompanyId = getUserCompanyId();
@@ -128,8 +133,29 @@ export default function RoutesManagement() {
     if (!selectedRoute) return;
     
     try {
-      // For now, we'll allow updates since Route doesn't have companyId
-      // Backend should handle company-based access control
+      // Only Manager can update
+      if (!isManager()) {
+        showMessage('Chỉ Manager mới có quyền cập nhật tuyến đường.', 'error');
+        return;
+      }
+      // Enforce company restriction on update: selected route must belong to manager's company
+      if (isCompanyRestricted()) {
+        const userCompanyId = getUserCompanyId();
+        if (userCompanyId) {
+          try {
+            const companiesResponse = await companyService.getAllCompanies(1, 100);
+            const userCompany = companiesResponse.data.find(c => c.id === userCompanyId);
+            if (userCompany && selectedRoute.companyName !== userCompany.name) {
+              showMessage('Bạn chỉ có thể cập nhật tuyến đường của công ty mình.', 'error');
+              return;
+            }
+          } catch {
+            // If company fetch fails, block to be safe
+            showMessage('Không thể xác minh công ty. Vui lòng thử lại.', 'error');
+            return;
+          }
+        }
+      }
       console.log('Updating route:', selectedRoute.id);
       
       await routeService.updateRoute(selectedRoute.id, data);
@@ -146,8 +172,28 @@ export default function RoutesManagement() {
     if (!selectedRoute) return;
     
     try {
-      // For now, we'll allow deletes since Route doesn't have companyId
-      // Backend should handle company-based access control
+      // Only Manager can delete
+      if (!isManager()) {
+        showMessage('Chỉ Manager mới có quyền xóa tuyến đường.', 'error');
+        return;
+      }
+      // Enforce company restriction on delete
+      if (isCompanyRestricted()) {
+        const userCompanyId = getUserCompanyId();
+        if (userCompanyId) {
+          try {
+            const companiesResponse = await companyService.getAllCompanies(1, 100);
+            const userCompany = companiesResponse.data.find(c => c.id === userCompanyId);
+            if (userCompany && selectedRoute.companyName !== userCompany.name) {
+              showMessage('Bạn chỉ có thể xóa tuyến đường của công ty mình.', 'error');
+              return;
+            }
+          } catch {
+            showMessage('Không thể xác minh công ty. Vui lòng thử lại.', 'error');
+            return;
+          }
+        }
+      }
       console.log('Deleting route:', selectedRoute.id);
       
       setIsDeleting(true);
@@ -330,15 +376,17 @@ export default function RoutesManagement() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
               </div>
-              <button
-                onClick={openCreateModal}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 mr-3"
-              >
-                <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                Thêm tuyến
-              </button>
+              {isManager() && (
+                <button
+                  onClick={openCreateModal}
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 mr-3"
+                >
+                  <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Thêm tuyến
+                </button>
+              )}
               <button
                 onClick={fetchRoutes}
                 className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-pink-600 hover:bg-pink-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-pink-500"
@@ -426,25 +474,29 @@ export default function RoutesManagement() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex items-center space-x-2">
-                      <button
-                        onClick={() => openEditModal(route)}
-                        className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
-                        title="Chỉnh sửa"
-                      >
-                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
-                      </button>
+                      {isManager() && (
+                        <button
+                          onClick={() => openEditModal(route)}
+                          className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+                          title="Chỉnh sửa"
+                        >
+                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                        </button>
+                      )}
                       
-                      <button
-                        onClick={() => openDeleteModal(route)}
-                        className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
-                        title="Xóa"
-                      >
-                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
+                      {isManager() && (
+                        <button
+                          onClick={() => openDeleteModal(route)}
+                          className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+                          title="Xóa"
+                        >
+                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      )}
 
                       {route.routeLicense && route.routeLicense.startsWith('http') && (
                         <a

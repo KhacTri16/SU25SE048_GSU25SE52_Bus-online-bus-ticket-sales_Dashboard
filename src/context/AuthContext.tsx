@@ -250,6 +250,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return state.user?.roleId === 3;
   };
 
+  const isDriver = (): boolean => {
+    return state.user?.roleId === 4;
+  };
+
+  const isSeller = (): boolean => {
+    return state.user?.roleId === 5;
+  };
+
   // Add new helper methods for company-based access control
   const getUserCompanyId = (): number | null => {
     if (!state.user?.companyId) return null;
@@ -262,7 +270,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     // Admin can access all companies
     if (isAdmin()) return true;
     
-    // Manager and Staff can only access their own company
+    // Manager, Staff, Driver, Seller can only access their own company
     const userCompanyId = getUserCompanyId();
     if (!userCompanyId) return false;
     
@@ -274,8 +282,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const isCompanyRestricted = (): boolean => {
-    // Only manager and staff are company-restricted
-    return isManager() || isStaff();
+    // Manager, Staff, Driver, Seller are company-restricted
+    return isManager() || isStaff() || isDriver() || isSeller();
   };
 
   const refreshToken = async (): Promise<void> => {
@@ -298,6 +306,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isAdmin,
     isManager,
     isStaff,
+    isDriver,
+    isSeller,
     refreshToken,
     getUserCompanyId,
     canAccessCompany,

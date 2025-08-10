@@ -27,7 +27,7 @@ export default function UserManagement() {
     );
   }
   
-  const { user, isAdmin, isCompanyRestricted, getUserCompanyId } = authContext;
+  const { isAdmin, isCompanyRestricted, getUserCompanyId } = authContext;
   const { openModal, closeModal, isOpen } = useModal();
   
   const [users, setUsers] = useState<SystemUser[]>([]);
@@ -93,6 +93,8 @@ export default function UserManagement() {
       case 1: return "Admin";
       case 2: return "Manager";
       case 3: return "Staff";
+      case 4: return "Driver";
+      case 5: return "Seller";
       default: return "Unknown";
     }
   };
@@ -336,11 +338,17 @@ export default function UserManagement() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          user.roleId === 1 
+                          user.roleId === 1
                             ? 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400'
                             : user.roleId === 2
                             ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400'
-                            : 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
+                            : user.roleId === 3
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
+                            : user.roleId === 4
+                            ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400'
+                            : user.roleId === 5
+                            ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400'
+                            : 'bg-gray-100 text-gray-800 dark:bg-gray-800/50 dark:text-gray-300'
                         }`}>
                           {getRoleName(user.roleId)}
                         </span>

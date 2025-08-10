@@ -24,7 +24,7 @@ interface CreateUserFormProps {
 }
 
 export default function CreateUserForm({ onSuccess }: CreateUserFormProps) {
-  const { user, isAdmin, isCompanyRestricted, getUserCompanyId } = useAuth();
+  const { isAdmin, isManager, isCompanyRestricted, getUserCompanyId } = useAuth();
   const navigate = useNavigate();
   
   const [showPassword, setShowPassword] = useState(false);
@@ -142,15 +142,21 @@ export default function CreateUserForm({ onSuccess }: CreateUserFormProps) {
 
     // Role validation based on current user's role
     if (isAdmin()) {
-      // Admin can create Manager (2) and Staff (3)
-      if (formData.Role !== 2 && formData.Role !== 3) {
-        setError("Admin chỉ có thể tạo tài khoản Manager hoặc Staff");
+      // Admin: only create Manager (2)
+      if (formData.Role !== 2) {
+        setError("Admin chỉ có thể tạo tài khoản Manager");
         return false;
       }
-    } else if (isCompanyRestricted()) {
-      // Manager can only create Staff (3)
-      if (formData.Role !== 3) {
-        setError("Manager chỉ có thể tạo tài khoản Staff");
+    } else if (isManager()) {
+      // Manager: can create Staff (3), Driver (4), Seller (5)
+      if (![3, 4, 5].includes(formData.Role)) {
+        setError("Manager chỉ có thể tạo tài khoản Staff, Driver hoặc Seller");
+        return false;
+      }
+      // Manager must create within their own company
+      const managerCompanyId = getUserCompanyId();
+      if (!managerCompanyId || formData.CompanyId !== managerCompanyId) {
+        setError("Manager chỉ có thể tạo tài khoản cho công ty của mình");
         return false;
       }
     } else {
@@ -206,12 +212,13 @@ export default function CreateUserForm({ onSuccess }: CreateUserFormProps) {
     try {
       if (isAdmin()) {
         return [
-          { value: 2, label: "Manager" },
-          { value: 3, label: "Staff" }
+          { value: 2, label: "Manager" }
         ];
-      } else if (isCompanyRestricted()) {
+      } else if (isManager()) {
         return [
-          { value: 3, label: "Staff" }
+          { value: 3, label: "Staff" },
+          { value: 4, label: "Driver" },
+          { value: 5, label: "Seller" }
         ];
       }
       return [];
@@ -223,18 +230,18 @@ export default function CreateUserForm({ onSuccess }: CreateUserFormProps) {
 
   const getPageTitle = () => {
     if (isAdmin()) {
-      return "Tạo tài khoản mới";
-    } else if (isCompanyRestricted()) {
-      return "Tạo tài khoản Staff";
+      return "Tạo tài khoản Manager";
+    } else if (isManager()) {
+      return "Tạo tài khoản cho công ty";
     }
     return "Tạo tài khoản";
   };
 
   const getPageDescription = () => {
     if (isAdmin()) {
-      return "Tạo tài khoản Manager hoặc Staff cho hệ thống";
-    } else if (isCompanyRestricted()) {
-      return "Tạo tài khoản Staff cho công ty của bạn";
+      return "Admin tạo tài khoản Manager cho hệ thống";
+    } else if (isManager()) {
+      return "Tạo tài khoản Staff / Driver / Seller cho công ty của bạn";
     }
     return "Tạo tài khoản mới";
   };
@@ -382,11 +389,29 @@ export default function CreateUserForm({ onSuccess }: CreateUserFormProps) {
                   }}
                 />
               </div>
+            ) : isManager() ? (
+              <div>
+                <Label htmlFor="Role">Vai trò <span className="text-red-500">*</span></Label>
+                <Select
+                  options={(getRoleOptions() || []).map(role => ({
+                    value: role.value.toString(),
+                    label: role.label
+                  }))}
+                  placeholder="Chọn vai trò"
+                  value={formData.Role ? formData.Role.toString() : ""}
+                  onChange={(value) => {
+                    setFormData(prev => ({
+                      ...prev,
+                      Role: parseInt(value) || 0
+                    }));
+                  }}
+                />
+              </div>
             ) : (
               <div>
                 <Label htmlFor="Role">Vai trò</Label>
                 <div className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300">
-                  Staff
+                  —
                 </div>
               </div>
             )}

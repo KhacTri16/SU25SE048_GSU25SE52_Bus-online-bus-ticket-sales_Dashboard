@@ -8,7 +8,7 @@ import AdminInfo from "../../components/auth/AdminInfo";
 import { useAuth } from "../../context/AuthContext";
 
 export default function XeTiicDashboard() {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, isManager } = useAuth();
 
   return (
     <>
@@ -18,7 +18,7 @@ export default function XeTiicDashboard() {
       />
       
       {/* Admin Info Section - Only show for first-time login or admin */}
-      {user && (isAdmin() || user.role === 'manager') && (
+      {user && (isAdmin() || isManager()) && (
         <div className="mb-8">
           <AdminInfo />
         </div>

@@ -3,12 +3,15 @@ import { stationService } from '../../services/api';
 import { Station, CreateStationRequest, UpdateStationRequest } from '../../types/company';
 import StationFormModal from '../../components/Station/StationFormModal';
 import DeleteConfirmModal from '../../components/Station/DeleteConfirmModal';
+import { useAuth } from '../../context/AuthContext';
+import RoleAccessNotice from '../../components/common/RoleAccessNotice';
 
 const StationList: React.FC = () => {
   const [stations, setStations] = useState<Station[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const { isAdmin } = useAuth();
   
   // Modal states
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
@@ -77,6 +80,10 @@ const StationList: React.FC = () => {
 
   const handleCreateStation = async (data: CreateStationRequest) => {
     try {
+      if (!isAdmin()) {
+        showMessage('Chỉ quản trị viên (Admin) mới có quyền tạo trạm.', 'error');
+        return;
+      }
       await stationService.createStation(data);
       showMessage('Tạo trạm xe thành công!', 'success');
       fetchStations();
@@ -90,6 +97,10 @@ const StationList: React.FC = () => {
   const handleUpdateStation = async (data: UpdateStationRequest) => {
     if (!selectedStation) return;
     try {
+      if (!isAdmin()) {
+        showMessage('Chỉ quản trị viên (Admin) mới có quyền cập nhật trạm.', 'error');
+        return;
+      }
       await stationService.updateStation(selectedStation.id, data);
       showMessage('Cập nhật trạm xe thành công!', 'success');
       fetchStations();
@@ -104,6 +115,10 @@ const StationList: React.FC = () => {
     if (!selectedStation) return;
     try {
       setIsDeleting(true);
+      if (!isAdmin()) {
+        showMessage('Chỉ quản trị viên (Admin) mới có quyền xóa trạm.', 'error');
+        return;
+      }
       await stationService.deleteStation(selectedStation.id);
       showMessage('Xóa trạm xe thành công!', 'success');
       setIsDeleteModalOpen(false);
@@ -192,6 +207,7 @@ const StationList: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      <RoleAccessNotice />
       {/* Statistics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
@@ -250,12 +266,14 @@ const StationList: React.FC = () => {
             </p>
           </div>
           <div className="flex gap-2">
-            <button 
-              onClick={openCreateModal}
-              className="px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 text-sm font-medium"
-            >
-              Thêm trạm xe mới
-            </button>
+            {isAdmin() && (
+              <button 
+                onClick={openCreateModal}
+                className="px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 text-sm font-medium"
+              >
+                Thêm trạm xe mới
+              </button>
+            )}
             <button 
               onClick={fetchStations}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
@@ -365,24 +383,24 @@ const StationList: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <button 
-                        onClick={() => openEditModal(station)}
-                        className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 mr-3"
-                      >
-                        Xem
-                      </button>
-                      <button 
-                        onClick={() => openEditModal(station)}
-                        className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300 mr-3"
-                      >
-                        Sửa
-                      </button>
-                      <button 
-                        onClick={() => openDeleteModal(station)}
-                        className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
-                      >
-                        Xóa
-                      </button>
+                      {isAdmin() ? (
+                        <>
+                          <button 
+                            onClick={() => openEditModal(station)}
+                            className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300 mr-3"
+                          >
+                            Sửa
+                          </button>
+                          <button 
+                            onClick={() => openDeleteModal(station)}
+                            className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+                          >
+                            Xóa
+                          </button>
+                        </>
+                      ) : (
+                        <span className="text-gray-400">Chỉ xem</span>
+                      )}
                     </td>
                   </tr>
                 ))

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { Station, CreateStationRequest, UpdateStationRequest } from "../../types/company";
+import { Station, CreateStationRequest, UpdateStationRequest, Location } from "../../types/company";
+import { locationService } from "../../services/api";
 
 interface StationFormModalProps {
   isOpen: boolean;
@@ -7,9 +8,11 @@ interface StationFormModalProps {
   onSubmit: (data: CreateStationRequest | UpdateStationRequest) => Promise<void>;
   station?: Station | null;
   title: string;
+  defaultLocationId?: number;
+  lockLocation?: boolean;
 }
 
-export default function StationFormModal({ isOpen, onClose, onSubmit, station, title }: StationFormModalProps) {
+export default function StationFormModal({ isOpen, onClose, onSubmit, station, title, defaultLocationId = 0, lockLocation = false }: StationFormModalProps) {
   const [formData, setFormData] = useState({
     name: '',
     locationId: 0,
@@ -17,9 +20,30 @@ export default function StationFormModal({ isOpen, onClose, onSubmit, station, t
   });
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [locations, setLocations] = useState<Location[]>([]);
+  const [loadingLocations, setLoadingLocations] = useState<boolean>(false);
+  const selectedLocationName = locations.find((l) => l.id === formData.locationId)?.name || '';
 
   useEffect(() => {
     if (isOpen) {
+      // load locations for dropdown
+      const loadLocations = async () => {
+        try {
+          setLoadingLocations(true);
+          const res = await locationService.getAllLocations();
+          if (res && Array.isArray(res.data)) {
+            setLocations(res.data);
+          } else {
+            setLocations([]);
+          }
+        } catch (e) {
+          setLocations([]);
+        } finally {
+          setLoadingLocations(false);
+        }
+      };
+      loadLocations();
+
       if (station) {
         setFormData({
           name: station.name,
@@ -29,13 +53,13 @@ export default function StationFormModal({ isOpen, onClose, onSubmit, station, t
       } else {
         setFormData({
           name: '',
-          locationId: 0,
+          locationId: defaultLocationId > 0 ? defaultLocationId : 0,
           status: 1,
         });
       }
       setErrors({});
     }
-  }, [isOpen, station]);
+  }, [isOpen, station, defaultLocationId]);
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -158,7 +182,7 @@ export default function StationFormModal({ isOpen, onClose, onSubmit, station, t
               )}
             </div>
 
-            {/* Location ID */}
+            {/* Location */}
             <div className="space-y-2">
               <label htmlFor="locationId" className="block text-sm font-semibold text-gray-700">
                 <span className="flex items-center">
@@ -166,31 +190,50 @@ export default function StationFormModal({ isOpen, onClose, onSubmit, station, t
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
-                  Mã địa điểm
+                  Địa điểm
                   <span className="text-red-500 ml-1">*</span>
                 </span>
               </label>
-              <div className="relative">
-                <input
-                  type="number"
-                  id="locationId"
-                  name="locationId"
-                  value={formData.locationId}
-                  onChange={handleInputChange}
-                  className={`w-full px-4 py-3 border-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
-                    errors.locationId ? 'border-red-300 focus:border-red-500' : 'border-gray-200 focus:border-blue-500'
-                  }`}
-                  placeholder="Nhập mã địa điểm (VD: 1, 2, 3...)"
-                  min="1"
-                />
-                {errors.locationId && (
-                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                    <svg className="h-5 w-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                )}
-              </div>
+              {lockLocation ? (
+                <div>
+                  <input
+                    type="text"
+                    value={selectedLocationName || '—'}
+                    disabled
+                    className={`w-full px-4 py-3 border-2 rounded-lg bg-gray-100 text-gray-700 ${
+                      errors.locationId ? 'border-red-300' : 'border-gray-200'
+                    }`}
+                  />
+                  <p className="mt-1 text-xs text-gray-500">Địa điểm được cố định theo lựa chọn trước đó</p>
+                </div>
+              ) : (
+                <div className="relative">
+                  <select
+                    id="locationId"
+                    name="locationId"
+                    value={formData.locationId}
+                    onChange={handleInputChange}
+                    className={`w-full px-4 py-3 border-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
+                      errors.locationId ? 'border-red-300 focus:border-red-500' : 'border-gray-200 focus:border-blue-500'
+                    } bg-white`}
+                    disabled={loadingLocations}
+                  >
+                    <option value={0} disabled>
+                      {loadingLocations ? 'Đang tải địa điểm...' : 'Chọn địa điểm'}
+                    </option>
+                    {locations.map((loc) => (
+                      <option key={loc.id} value={loc.id}>{loc.name}</option>
+                    ))}
+                  </select>
+                  {errors.locationId && (
+                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                      <svg className="h-5 w-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                  )}
+                </div>
+              )}
               {errors.locationId && (
                 <p className="flex items-center text-sm text-red-600">
                   <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
