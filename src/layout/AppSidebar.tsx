@@ -8,8 +8,7 @@ import {
   ChevronDownIcon,
   GridIcon,
   HorizontaLDots,
-  BoxIconLine,
-  PageIcon,
+  // ...existing code...
   PieChartIcon,
   PlugInIcon,
   TableIcon,

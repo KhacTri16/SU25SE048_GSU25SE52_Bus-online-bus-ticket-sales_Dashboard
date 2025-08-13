@@ -2,11 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import ReactApexChart from "react-apexcharts";
 import PageMeta from "../../components/common/PageMeta";
 import { useAuth } from "../../context/AuthContext";
-import { paymentService, CompanyRevenueData, TotalRevenueResponse } from "../../services/api";
+import { paymentService, CompanyRevenueData } from "../../services/api";
 
 export default function RevenueReport() {
   const authContext = useAuth();
-  const { getUserCompanyId, hasPermission, isAdmin } = authContext;
+  const { getUserCompanyId, isAdmin } = authContext;
   const [year, setYear] = useState<number>(new Date().getFullYear());
   const [monthlyRevenue, setMonthlyRevenue] = useState<number[]>(Array(12).fill(0));
   const [totalRevenue, setTotalRevenue] = useState<number | null>(null);
@@ -73,9 +73,9 @@ export default function RevenueReport() {
             // For chart display, show aggregated monthly data from all companies
             const aggregatedMonthly = Array(12).fill(0);
             allRevenueData.companiesRevenue.forEach(company => {
-              company.monthlyRevenue.forEach((revenue, index) => {
-                if (index < 12) {
-                  aggregatedMonthly[index] += revenue;
+              company.monthlyRevenue.forEach((revenue, idx) => {
+                if (idx < 12) {
+                  aggregatedMonthly[idx] += revenue;
                 }
               });
             });
@@ -326,7 +326,7 @@ export default function RevenueReport() {
                     </td>
                   </tr>
                 ) : (
-                  allCompaniesData.map((company, index) => {
+                  allCompaniesData.map((company, _) => {
                     const currentMonthRevenue = company.monthlyRevenue[new Date().getMonth()] || 0;
                     const percentage = systemTotalRevenue ? ((company.totalRevenue / systemTotalRevenue) * 100) : 0;
                     

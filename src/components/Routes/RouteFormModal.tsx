@@ -12,7 +12,7 @@ interface RouteFormModalProps {
 }
 
 export default function RouteFormModal({ isOpen, onClose, onSubmit, route, title }: RouteFormModalProps) {
-  const { user, isAdmin, isCompanyRestricted, getUserCompanyId } = useAuth();
+  const { isAdmin, isCompanyRestricted, getUserCompanyId } = useAuth();
   const [formData, setFormData] = useState({
     routeId: '',
     fromLocation: '',
@@ -22,7 +22,7 @@ export default function RouteFormModal({ isOpen, onClose, onSubmit, route, title
     description: '',
     companyId: 0,
   });
-  const [license, setLicense] = useState<File | null>(null);
+  const [license, setLicense] = useState<File | undefined>(undefined);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -88,7 +88,7 @@ export default function RouteFormModal({ isOpen, onClose, onSubmit, route, title
       description: '',
       companyId: isCompanyRestricted() && userCompanyId ? userCompanyId : 0,
     });
-    setLicense(null);
+  setLicense(undefined);
     setErrors({});
   };
 
@@ -129,7 +129,7 @@ export default function RouteFormModal({ isOpen, onClose, onSubmit, route, title
       setSubmitting(true);
       const submitData = {
         ...formData,
-        license,
+  license,
       };
       await onSubmit(submitData);
       onClose();
@@ -144,7 +144,7 @@ export default function RouteFormModal({ isOpen, onClose, onSubmit, route, title
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setLicense(file);
+  setLicense(file);
     }
   };
 

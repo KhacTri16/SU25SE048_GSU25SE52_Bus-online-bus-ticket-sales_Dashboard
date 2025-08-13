@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { authService, SystemUser, SystemUserLoginResponse, ROLE_PERMISSIONS } from '../services/api';
+import { authService, SystemUserLoginResponse, ROLE_PERMISSIONS } from '../services/api';
 
 export interface User {
   id: string;
@@ -319,50 +319,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-// Mock functions - replace with real API calls
-const mockLogin = async (credentials: LoginCredentials) => {
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 1000));
-
-  // Mock admin account
-  if (credentials.email === 'admin@xetiic.com' && credentials.password === 'admin123') {
-    return {
-      user: {
-        id: '1',
-        email: 'admin@xetiic.com',
-        firstName: 'Admin',
-        lastName: 'User',
-        role: 'admin' as const,
-        permissions: ['all'],
-        isActive: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      },
-      token: 'mock_admin_token_' + Date.now(),
-    };
-  }
-
-  // Mock manager account
-  if (credentials.email === 'manager@xetiic.com' && credentials.password === 'manager123') {
-    return {
-      user: {
-        id: '2',
-        email: 'manager@xetiic.com',
-        firstName: 'Manager',
-        lastName: 'User',
-        role: 'manager' as const,
-        permissions: ['stations.read', 'stations.write', 'routes.read', 'routes.write'],
-        companyId: '1',
-        isActive: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      },
-      token: 'mock_manager_token_' + Date.now(),
-    };
-  }
-
-  throw new Error('Thông tin đăng nhập không đúng');
-};
 
 const mockRegister = async (data: RegisterData) => {
   // Simulate API delay
