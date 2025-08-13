@@ -27,7 +27,11 @@ export default function UserManagement() {
     );
   }
   
-  const { isAdmin, isCompanyRestricted, getUserCompanyId } = authContext;
+  const { isAdmin, isManager, isStaff, getUserCompanyId } = authContext;
+  
+  // Define role check functions locally to avoid TypeScript issues
+  const isDriver = () => authContext.user?.roleId === 4;
+  const isSeller = () => authContext.user?.roleId === 5;
   const { openModal, closeModal, isOpen } = useModal();
   
   const [users, setUsers] = useState<SystemUser[]>([]);
@@ -50,11 +54,29 @@ export default function UserManagement() {
       
       // Filter users based on RBAC
       let filteredUsers = response.data || [];
-      if (isCompanyRestricted()) {
+      
+      if (isAdmin()) {
+        // Admin can see all users
+        filteredUsers = response.data || [];
+      } else if (isManager()) {
+        // Manager can only see staff/seller/driver from their company
         const userCompanyId = getUserCompanyId();
         if (userCompanyId) {
-          filteredUsers = (response.data || []).filter(user => user.companyId === userCompanyId);
-          console.log(`Filtered users for user companyId ${userCompanyId}:`, filteredUsers);
+          filteredUsers = (response.data || []).filter(user => 
+            user.companyId === userCompanyId && 
+            (user.roleId === 3 || user.roleId === 4 || user.roleId === 5) // Staff, Driver, Seller
+          );
+          console.log(`Manager filtered users for companyId ${userCompanyId}:`, filteredUsers);
+        }
+      } else if (isStaff() || isDriver() || isSeller()) {
+        // Staff/Driver/Seller can only see staff/seller/driver from their company
+        const userCompanyId = getUserCompanyId();
+        if (userCompanyId) {
+          filteredUsers = (response.data || []).filter(user => 
+            user.companyId === userCompanyId && 
+            (user.roleId === 3 || user.roleId === 4 || user.roleId === 5) // Staff, Driver, Seller
+          );
+          console.log(`Staff/Driver/Seller filtered users for companyId ${userCompanyId}:`, filteredUsers);
         }
       }
       
@@ -114,7 +136,7 @@ export default function UserManagement() {
 
   const canCreateUser = () => {
     try {
-      return isAdmin() || isCompanyRestricted();
+      return isAdmin() || isManager(); // Only Admin and Manager can create users
     } catch (error) {
       console.error('Error checking user permissions:', error);
       return false;
@@ -125,8 +147,10 @@ export default function UserManagement() {
     try {
       if (isAdmin()) {
         return "Quản lý người dùng";
-      } else if (isCompanyRestricted()) {
-        return "Quản lý người dùng công ty";
+      } else if (isManager()) {
+        return "Quản lý nhân viên công ty";
+      } else if (isStaff() || isDriver() || isSeller()) {
+        return "Danh sách đồng nghiệp";
       }
       return "Quản lý người dùng";
     } catch (error) {
@@ -139,8 +163,10 @@ export default function UserManagement() {
     try {
       if (isAdmin()) {
         return "Quản lý tất cả người dùng trong hệ thống";
-      } else if (isCompanyRestricted()) {
-        return "Quản lý người dùng của công ty bạn";
+      } else if (isManager()) {
+        return "Quản lý nhân viên (Staff/Driver/Seller) trong công ty của bạn";
+      } else if (isStaff() || isDriver() || isSeller()) {
+        return "Xem danh sách đồng nghiệp trong công ty";
       }
       return "Quản lý người dùng";
     } catch (error) {
@@ -238,16 +264,18 @@ export default function UserManagement() {
           </div>
         )}
 
-        {/* Action Buttons */}
-        <div className="mb-6 flex flex-col sm:flex-row gap-3">
-          <button
-            onClick={openModal}
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-pink-600 px-4 py-2 text-sm font-medium text-white hover:bg-pink-700 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-2 disabled:opacity-50"
-          >
-            <PlusIcon className="h-4 w-4" />
-            Tạo tài khoản mới
-          </button>
-        </div>
+        {/* Action Buttons - Only show for Admin and Manager */}
+        {(isAdmin() || isManager()) && (
+          <div className="mb-6 flex flex-col sm:flex-row gap-3">
+            <button
+              onClick={openModal}
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-pink-600 px-4 py-2 text-sm font-medium text-white hover:bg-pink-700 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-2 disabled:opacity-50"
+            >
+              <PlusIcon className="h-4 w-4" />
+              {isManager() ? "Tạo tài khoản nhân viên" : "Tạo tài khoản mới"}
+            </button>
+          </div>
+        )}
 
         {/* Users Table */}
         <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
@@ -382,26 +410,34 @@ export default function UserManagement() {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <div className="flex justify-end gap-2">
-                          <button
-                            className="text-pink-600 hover:text-pink-900 dark:text-pink-400 dark:hover:text-pink-300"
-                            onClick={() => {
-                              // TODO: Implement edit functionality
-                              console.log('Edit user:', user.id);
-                            }}
-                          >
-                            <PencilIcon className="h-4 w-4" />
-                          </button>
-                          <button
-                            className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
-                            onClick={() => {
-                              // TODO: Implement delete functionality
-                              console.log('Delete user:', user.id);
-                            }}
-                          >
-                            <TrashBinIcon className="h-4 w-4" />
-                          </button>
-                        </div>
+                        {(isAdmin() || isManager()) ? (
+                          <div className="flex justify-end gap-2">
+                            <button
+                              className="text-pink-600 hover:text-pink-900 dark:text-pink-400 dark:hover:text-pink-300"
+                              onClick={() => {
+                                // TODO: Implement edit functionality
+                                console.log('Edit user:', user.id);
+                              }}
+                              title="Chỉnh sửa"
+                            >
+                              <PencilIcon className="h-4 w-4" />
+                            </button>
+                            <button
+                              className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+                              onClick={() => {
+                                // TODO: Implement delete functionality
+                                console.log('Delete user:', user.id);
+                              }}
+                              title="Xóa"
+                            >
+                              <TrashBinIcon className="h-4 w-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="text-gray-400 text-sm">
+                            Chỉ xem
+                          </div>
+                        )}
                       </td>
                     </tr>
                   ))

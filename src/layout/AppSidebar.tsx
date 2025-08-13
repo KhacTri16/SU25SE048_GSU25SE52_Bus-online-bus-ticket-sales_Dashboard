@@ -9,7 +9,7 @@ import {
   GridIcon,
   HorizontaLDots,
   BoxIconLine,
-  // PageIcon,
+  PageIcon,
   PieChartIcon,
   PlugInIcon,
   TableIcon,
@@ -32,20 +32,11 @@ const navItems: NavItem[] = [
     name: "Dashboard",
     subItems: [{ name: "XeTiic Dashboard", path: "/", pro: false }],
   },
-  {
-    icon: <BoxIconLine />,
-    name: "Quản lý vé",
-    subItems: [
-      { name: "Đặt vé mới", path: "/book-ticket", pro: false },
-      { name: "Danh sách vé", path: "/tickets", pro: false },
-      { name: "Hủy/Hoàn vé", path: "/cancel-ticket", pro: false },
-    ],
-  },
+
   {
     icon: <CalenderIcon />,
     name: "Lịch trình",
     subItems: [
-      { name: "Quản lý xe ", path: "/schedule", pro: false },
       { name: "Quản lý tuyến", path: "/routes", pro: false },
     ],
   },
@@ -69,7 +60,6 @@ const navItems: NavItem[] = [
     name: "Khách hàng",
     subItems: [
       { name: "Danh sách KH", path: "/customers", pro: false },
-      { name: "Lịch sử đặt vé", path: "/booking-history", pro: false },
     ],
   },
   {
@@ -77,27 +67,19 @@ const navItems: NavItem[] = [
     icon: <PieChartIcon />,
     subItems: [
       { name: "Doanh thu", path: "/reports/revenue", pro: false },
-      { name: "Thống kê vé", path: "/reports/tickets", pro: false },
     ],
   },
-];const othersItems: NavItem[] = [
+];
+
+const othersItems: NavItem[] = [
   {
     icon: <TableIcon />,
     name: "Cài đặt",
     subItems: [
-      { name: "Cấu hình hệ thống", path: "/settings", pro: false },
       { name: "Quản lý người dùng", path: "/users", pro: false },
     ],
   },
-  {
-    icon: <BoxCubeIcon />,
-    name: "Tiện ích",
-    subItems: [
-      { name: "Thông báo", path: "/notifications", pro: false },
-      { name: "Tin tức", path: "/news", pro: false },
-      { name: "Hỗ trợ", path: "/support", pro: false },
-    ],
-  },
+
   {
     icon: <PlugInIcon />,
     name: "Tài khoản",

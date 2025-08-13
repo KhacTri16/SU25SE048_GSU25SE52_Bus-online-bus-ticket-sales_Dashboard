@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from "react-router";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router";
 import { ThemeProvider } from "./context/ThemeContext";
 import { SidebarProvider } from "./context/SidebarContext";
 import { AuthProvider } from "./context/AuthContext";
@@ -80,7 +80,7 @@ export default function App() {
   
   return (
     <ErrorBoundary>
-  <Router basename="/">
+      <Router basename="/XeTiic">
         <AuthProvider>
           <ThemeProvider>
             <SidebarProvider>
@@ -158,8 +158,19 @@ export default function App() {
                             }
                           />
 
-                          {/* Fallback Route for protected area */}
-                          <Route path="*" element={<NotFound />} />
+                          {/* Blocked Routes - Redirect to Dashboard */}
+                          <Route path="book-ticket" element={<Navigate to="/" replace />} />
+                          <Route path="tickets" element={<Navigate to="/" replace />} />
+                          <Route path="cancel-ticket" element={<Navigate to="/" replace />} />
+                          <Route path="schedule" element={<Navigate to="/" replace />} />
+                          <Route path="booking-history" element={<Navigate to="/" replace />} />
+                          <Route path="reports/tickets" element={<Navigate to="/" replace />} />
+                          <Route path="settings" element={<Navigate to="/" replace />} />
+                          <Route path="notifications" element={<Navigate to="/" replace />} />
+                          <Route path="news" element={<Navigate to="/" replace />} />
+                          <Route path="support" element={<Navigate to="/" replace />} />
+
+
                         </Route>
                       </Routes>
                     </AuthGuard>

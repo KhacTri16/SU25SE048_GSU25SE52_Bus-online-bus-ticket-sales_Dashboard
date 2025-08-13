@@ -490,12 +490,31 @@ export interface MonthlyRevenueResponse {
   revenue: number;
 }
 
+export interface CompanyRevenueData {
+  companyId: number;
+  companyName: string;
+  totalRevenue: number;
+  monthlyRevenue: number[];
+}
+
+export interface TotalRevenueResponse {
+  totalRevenue: number;
+  companiesRevenue: CompanyRevenueData[];
+}
+
 export const paymentService = {
   async getCompanyTotalRevenue(companyId: number): Promise<number> {
-    const response = await api.get<number>(`/api/Payment/company/revenue/total`, {
-      params: { companyId },
-    });
-    return response.data as unknown as number;
+    try {
+      console.log(`Fetching revenue for company ${companyId}...`);
+      const response = await api.get<number>(`/api/Payment/company/revenue/total`, {
+        params: { companyId },
+      });
+      console.log(`Company ${companyId} revenue:`, response.data);
+      return typeof response.data === 'number' ? response.data : 0;
+    } catch (error) {
+      console.error(`Error fetching revenue for company ${companyId}:`, error);
+      return 0;
+    }
   },
 
   async getMonthlyRevenue(
@@ -503,10 +522,108 @@ export const paymentService = {
     year: number,
     month: number
   ): Promise<MonthlyRevenueResponse> {
-    const response = await api.get<MonthlyRevenueResponse>(
-      `/Payment/monthly-revenue/${companyId}/${year}/${month}`
-    );
-    return response.data;
+    try {
+      console.log(`Fetching monthly revenue: /Payment/monthly-revenue/${companyId}/${year}/${month}`);
+      const response = await api.get<MonthlyRevenueResponse>(
+        `/Payment/monthly-revenue/${companyId}/${year}/${month}`
+      );
+      console.log(`Monthly revenue response for ${companyId}/${year}/${month}:`, response.data);
+      return response.data;
+    } catch (error) {
+      console.warn(`Monthly revenue endpoint failed for ${companyId}/${year}/${month}:`, error);
+      // Return default structure if endpoint fails
+      return {
+        companyId,
+        year,
+        month,
+        revenue: 0
+      };
+    }
+  },
+
+  // New API for Admin to get total revenue of all companies
+  async getAllCompaniesRevenue(): Promise<TotalRevenueResponse> {
+    try {
+      console.log('Fetching total revenue from API...');
+      const response = await api.get<number>('/api/Payment/revenue/total');
+      console.log('API Response:', response.data);
+      
+      // Since the API returns just a number (total revenue), we need to create the structure
+      // For now, we'll create a mock structure until we get company-specific data
+      const totalRevenue = typeof response.data === 'number' ? response.data : 0;
+      
+      return {
+        totalRevenue,
+        companiesRevenue: [] // Will be populated when we have company-specific endpoints
+      };
+    } catch (error) {
+      console.error('Error fetching total revenue:', error);
+      throw error;
+    }
+  },
+
+  // Method to get companies revenue individually with detailed breakdown
+  async getAllCompaniesRevenueDetailed(): Promise<TotalRevenueResponse> {
+    try {
+      console.log('Fetching detailed companies revenue...');
+      
+      // First get all companies using the correct service
+      const companiesResponse = await companyService.getAllCompanies(1, 100);
+      
+      const companies = companiesResponse.data || [];
+      console.log('Companies found:', companies.length);
+      
+      if (companies.length === 0) {
+        console.warn('No companies found');
+        return {
+          totalRevenue: 0,
+          companiesRevenue: []
+        };
+      }
+      
+      // Get revenue for each company using the individual endpoint
+      const companiesRevenue: CompanyRevenueData[] = [];
+      let calculatedTotalRevenue = 0;
+      
+      console.log('Fetching revenue for each company...');
+      for (const company of companies) {
+        const companyRevenue = await this.getCompanyTotalRevenue(company.id);
+        calculatedTotalRevenue += companyRevenue;
+        
+        companiesRevenue.push({
+          companyId: company.id,
+          companyName: company.name,
+          totalRevenue: companyRevenue,
+          monthlyRevenue: Array(12).fill(0) // Placeholder - would need monthly endpoint per company
+        });
+      }
+      
+      console.log('Revenue calculation summary:', {
+        totalCompanies: companies.length,
+        calculatedTotal: calculatedTotalRevenue,
+        companiesWithRevenue: companiesRevenue.filter(c => c.totalRevenue > 0).length
+      });
+      
+      // Also get the system total for comparison
+      let systemTotalRevenue = calculatedTotalRevenue;
+      try {
+        const totalRevenueResponse = await api.get<number>('/api/Payment/revenue/total');
+        const apiTotal = typeof totalRevenueResponse.data === 'number' ? totalRevenueResponse.data : 0;
+        console.log('API total vs calculated total:', { apiTotal, calculatedTotal: calculatedTotalRevenue });
+        // Use the API total as it might be more accurate
+        systemTotalRevenue = apiTotal;
+      } catch (error) {
+        console.warn('Could not fetch system total revenue, using calculated total:', error);
+      }
+      
+      return {
+        totalRevenue: systemTotalRevenue,
+        companiesRevenue: companiesRevenue.sort((a, b) => b.totalRevenue - a.totalRevenue) // Sort by revenue desc
+      };
+    } catch (error) {
+      console.error('Error fetching detailed companies revenue:', error);
+      throw error;
+    }
   },
 };
 
