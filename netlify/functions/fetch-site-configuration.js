@@ -1,6 +1,9 @@
 exports.handler = async function(event, context) {
   return {
     statusCode: 200,
-    body: JSON.stringify({ config: "default" })
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ config: "default", status: "ok" })
   };
 };
