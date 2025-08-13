@@ -80,7 +80,7 @@ export default function App() {
   
   return (
     <ErrorBoundary>
-      <Router basename="/XeTiic">
+  <Router basename="/">
         <AuthProvider>
           <ThemeProvider>
             <SidebarProvider>
