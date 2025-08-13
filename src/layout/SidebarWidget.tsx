@@ -2,7 +2,7 @@ import React from 'react';
 import { useAuth } from '../context/AuthContext';
 
 const SidebarWidget: React.FC = () => {
-  const { user, isAdmin, isManager, isStaff } = useAuth();
+  const { user } = useAuth();
 
   if (!user) return null;
 

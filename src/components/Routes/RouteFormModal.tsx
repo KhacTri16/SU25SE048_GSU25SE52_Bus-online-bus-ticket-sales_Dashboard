@@ -12,7 +12,7 @@ interface RouteFormModalProps {
 }
 
 export default function RouteFormModal({ isOpen, onClose, onSubmit, route, title }: RouteFormModalProps) {
-  const { user, isAdmin, isCompanyRestricted, getUserCompanyId } = useAuth();
+  const { isAdmin, isCompanyRestricted, getUserCompanyId } = useAuth();
   const [formData, setFormData] = useState({
     routeId: '',
     fromLocation: '',
@@ -129,7 +129,7 @@ export default function RouteFormModal({ isOpen, onClose, onSubmit, route, title
       setSubmitting(true);
       const submitData = {
         ...formData,
-        license,
+  license: license ?? undefined,
       };
       await onSubmit(submitData);
       onClose();

@@ -5,7 +5,7 @@ import { useAuth } from "../../context/AuthContext";
 import { paymentService } from "../../services/api";
 
 export default function RevenueReport() {
-  const { getUserCompanyId, hasPermission } = useAuth();
+  const { getUserCompanyId } = useAuth();
   const [year, setYear] = useState<number>(new Date().getFullYear());
   const [monthlyRevenue, setMonthlyRevenue] = useState<number[]>(Array(12).fill(0));
   const [totalRevenue, setTotalRevenue] = useState<number | null>(null);

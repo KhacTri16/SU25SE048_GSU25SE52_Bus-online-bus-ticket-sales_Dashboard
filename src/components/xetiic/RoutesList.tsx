@@ -51,7 +51,7 @@ const routesData = [
 export default function RoutesList() {
   const [routes] = useState(routesData);
 
-  const getStatusBadge = (status: string, available: number, total: number) => {
+  const getStatusBadge = (status: string, available: number) => {
     if (status === "full") {
       return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400">Hết vé</span>;
     } else if (available <= 5) {
@@ -116,7 +116,7 @@ export default function RoutesList() {
                   <span className="text-gray-500 dark:text-gray-400">/{route.total}</span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  {getStatusBadge(route.status, route.available, route.total)}
+                  {getStatusBadge(route.status, route.available)}
                 </td>
               </tr>
             ))}
