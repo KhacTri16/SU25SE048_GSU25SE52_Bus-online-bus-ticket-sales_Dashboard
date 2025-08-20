@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
-import { Route, CreateRouteRequest, UpdateRouteRequest } from "../../types/company";
-import { routeService, companyService } from "../../services/api";
+import { useState, useEffect, Fragment } from "react";
+import { Route, CreateRouteRequest, UpdateRouteRequest, Trip, CreateTripRequest } from "../../types/company";
+import { routeService, companyService, tripService } from "../../services/api";
 import PageMeta from "../../components/common/PageMeta";
 import RouteFormModal from "../../components/Routes/RouteFormModal";
 import DeleteConfirmModal from "../../components/Routes/DeleteConfirmModal";
@@ -8,7 +8,7 @@ import { useAuth } from "../../context/AuthContext";
 import RoleAccessNotice from "../../components/common/RoleAccessNotice";
 
 export default function RoutesManagement() {
-  const { isManager, isCompanyRestricted, getUserCompanyId } = useAuth();
+  const { isManager, isAdmin, isCompanyRestricted, getUserCompanyId } = useAuth();
   const [routes, setRoutes] = useState<Route[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -26,6 +26,10 @@ export default function RoutesManagement() {
   // Success/Error messages
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [tripsByRouteId, setTripsByRouteId] = useState<Record<number, Trip[]>>({});
+  const [expandedRoutes, setExpandedRoutes] = useState<Record<number, boolean>>({});
+  const [creatingTripForRoute, setCreatingTripForRoute] = useState<Route | null>(null);
+  const [newTrip, setNewTrip] = useState<CreateTripRequest | null>(null);
 
   useEffect(() => {
     fetchRoutes();
@@ -71,7 +75,6 @@ export default function RoutesManagement() {
             }
           } catch (companyError) {
             console.error('Error fetching companies for filtering:', companyError);
-            // If we can't fetch companies, show all routes (backend should handle filtering)
             console.log('Showing all routes (backend should filter)');
           }
         }
@@ -80,11 +83,73 @@ export default function RoutesManagement() {
       setRoutes(filteredRoutes);
       setTotalPages(response.totalPage);
       setTotalCount(filteredRoutes.length); // Use filtered count
+      // Fetch trips for the currently visible routes
+      await fetchTripsForRoutes(filteredRoutes);
     } catch (err) {
       setError('Không thể tải dữ liệu tuyến đường. Vui lòng thử lại.');
       console.error('Error fetching routes:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchTripsForRoutes = async (visibleRoutes: Route[]) => {
+    try {
+      const tripsResponse = await tripService.getAllTrips(0, 1000, true);
+      const routeIds = new Set(visibleRoutes.map(r => r.id));
+      const map: Record<number, Trip[]> = {};
+      for (const trip of tripsResponse.data || []) {
+        if (routeIds.has(trip.routeId) && !trip.isDeleted) {
+          if (!map[trip.routeId]) map[trip.routeId] = [];
+          map[trip.routeId].push(trip);
+        }
+      }
+      setTripsByRouteId(map);
+    } catch (e) {
+      console.error('Error fetching trips:', e);
+    }
+  };
+
+  const toggleExpand = (routeId: number) => {
+    setExpandedRoutes(prev => ({ ...prev, [routeId]: !prev[routeId] }));
+  };
+
+  const openCreateTrip = (route: Route) => {
+    if (!isManager()) {
+      showMessage('Chỉ Manager mới có thể tạo chuyến.', 'error');
+      return;
+    }
+    if (!route.isCreate || route.isDelete) {
+      showMessage('Chỉ có thể tạo chuyến cho tuyến đã được Admin duyệt.', 'error');
+      return;
+    }
+    setCreatingTripForRoute(route);
+    setNewTrip({
+      timeStart: new Date().toISOString(),
+      timeEnd: new Date(Date.now() + 3600000).toISOString(),
+      price: 0,
+      routeId: route.id,
+      busId: 0,
+      driverId: 0,
+      description: ''
+    });
+  };
+
+  const submitCreateTrip = async () => {
+    if (!creatingTripForRoute || !newTrip) return;
+    try {
+      if (!isManager()) {
+        showMessage('Chỉ Manager mới có thể tạo chuyến.', 'error');
+        return;
+      }
+      await tripService.createTrip(newTrip);
+      showMessage('Tạo chuyến thành công!', 'success');
+      setCreatingTripForRoute(null);
+      setNewTrip(null);
+      await fetchTripsForRoutes(routes);
+    } catch (e) {
+      console.error('Error creating trip:', e);
+      showMessage('Không thể tạo chuyến. Vui lòng thử lại.', 'error');
     }
   };
 
@@ -120,7 +185,7 @@ export default function RoutesManagement() {
       }
       
       await routeService.createRoute(data);
-      showMessage('Tạo tuyến đường thành công!', 'success');
+      showMessage('Tạo tuyến đường thành công! Chờ Admin duyệt.', 'success');
       fetchRoutes();
     } catch (error) {
       console.error('Error creating route:', error);
@@ -257,12 +322,36 @@ export default function RoutesManagement() {
   };
 
   const getStatusBadge = (route: Route) => {
-    if (!route.isCreate) {
-      return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400">Chưa tạo</span>;
-    } else if (route.isDelete) {
+    if (route.isDelete) {
       return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400">Đã xóa</span>;
+    } else if (!route.isCreate) {
+      return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400">Chờ duyệt</span>;
     } else {
       return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400">Hoạt động</span>;
+    }
+  };
+
+  const getTripsForRoute = (routeId: number): Trip[] => {
+    return tripsByRouteId[routeId] || [];
+  };
+
+  const hasTripsForRoute = (routeId: number): boolean => {
+    const trips = getTripsForRoute(routeId);
+    return trips.length > 0;
+  };
+
+  const handleApproveRoute = async (route: Route) => {
+    try {
+      if (!isAdmin()) {
+        showMessage('Chỉ Admin mới có quyền duyệt tuyến đường.', 'error');
+        return;
+      }
+      await routeService.activateRoute(route.id);
+      showMessage('Đã duyệt tuyến đường thành công.', 'success');
+      fetchRoutes();
+    } catch (error) {
+      console.error('Error approving route:', error);
+      showMessage('Không thể duyệt tuyến đường. Vui lòng thử lại.', 'error');
     }
   };
 
@@ -318,6 +407,20 @@ export default function RoutesManagement() {
                 </svg>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Admin pending approval notice */}
+      {isAdmin() && routes.some(r => !r.isCreate && !r.isDelete) && (
+        <div className="mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4 dark:bg-yellow-900/10 dark:border-yellow-800">
+          <div className="flex items-center">
+            <svg className="h-5 w-5 text-yellow-500" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M8.257 3.099c.366-.756 1.42-.756 1.786 0l7.163 14.787A1 1 0 0116.163 20H3.837a1 1 0 01-.894-1.45L10.106 3.1zM11 14a1 1 0 10-2 0 1 1 0 002 0zm-1-2a1 1 0 01-1-1V7a1 1 0 112 0v4a1 1 0 01-1 1z" clipRule="evenodd" />
+            </svg>
+            <p className="ml-3 text-sm text-yellow-800 dark:text-yellow-200">
+              Bạn cần duyệt chuyến đi mới. Có {routes.filter(r => !r.isCreate && !r.isDelete).length} tuyến chờ duyệt.
+            </p>
           </div>
         </div>
       )}
@@ -435,13 +538,18 @@ export default function RoutesManagement() {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200 dark:bg-transparent dark:divide-gray-800">
               {filteredRoutes.map((route) => (
-                <tr key={route.id} className="hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                <Fragment key={route.id}>
+                <tr className="hover:bg-gray-50 dark:hover:bg-white/[0.02]">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900 dark:text-white">
                       {route.routeId}
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td
+                    className="px-6 py-4 whitespace-nowrap cursor-pointer"
+                    onClick={() => toggleExpand(route.id)}
+                    title={expandedRoutes[route.id] ? 'Ẩn chuyến' : 'Xem chuyến'}
+                  >
                     <div className="text-sm text-gray-900 dark:text-white">
                       <div className="font-medium">{route.fromLocation}</div>
                       <div className="text-gray-500 dark:text-gray-400">→ {route.toLocation}</div>
@@ -474,6 +582,26 @@ export default function RoutesManagement() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => toggleExpand(route.id)}
+                        className="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
+                        title={expandedRoutes[route.id] ? 'Ẩn chuyến' : 'Xem chuyến'}
+                      >
+                        <svg className={`h-4 w-4 transform transition-transform ${expandedRoutes[route.id] ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </button>
+                      {isAdmin() && !route.isCreate && !route.isDelete && (
+                        <button
+                          onClick={() => handleApproveRoute(route)}
+                          className="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300"
+                          title="Duyệt tuyến"
+                        >
+                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </button>
+                      )}
                       {isManager() && (
                         <button
                           onClick={() => openEditModal(route)}
@@ -514,6 +642,65 @@ export default function RoutesManagement() {
                     </div>
                   </td>
                 </tr>
+                {expandedRoutes[route.id] && (
+                  <tr>
+                    <td colSpan={isCompanyRestricted() ? 7 : 8} className="px-6 pb-6">
+                      <div className="mt-2 rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
+                        <div className="bg-gray-50 dark:bg-gray-900/50 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Chuyến đi của tuyến {route.routeId}
+                        </div>
+                        <div className="overflow-x-auto">
+                          {hasTripsForRoute(route.id) && (
+                            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
+                              <thead className="bg-white dark:bg-transparent">
+                                <tr>
+                                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">Mã chuyến</th>
+                                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">Lộ trình</th>
+                                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">Khởi hành</th>
+                                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">Đến nơi</th>
+                                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">Giá vé</th>
+                                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">Xe</th>
+                                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">Trạng thái</th>
+                                </tr>
+                              </thead>
+                              <tbody className="bg-white divide-y divide-gray-200 dark:bg-transparent dark:divide-gray-800">
+                                {getTripsForRoute(route.id).map(trip => (
+                                  <tr key={trip.id}>
+                                    <td className="px-4 py-2 text-sm text-gray-900 dark:text-white">{trip.tripId}</td>
+                                    <td className="px-4 py-2 text-sm text-gray-900 dark:text-white">{trip.fromLocation} → {trip.endLocation}</td>
+                                    <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300">{new Date(trip.timeStart).toLocaleString('vi-VN')}</td>
+                                    <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300">{new Date(trip.timeEnd).toLocaleString('vi-VN')}</td>
+                                    <td className="px-4 py-2 text-sm text-gray-900 dark:text-white">{trip.price.toLocaleString('vi-VN')} đ</td>
+                                    <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300">{trip.busName}</td>
+                                    <td className="px-4 py-2">
+                                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${trip.status === 1 ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400' : 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400'}`}>
+                                        {trip.status === 1 ? 'Hoạt động' : 'Tạm dừng'}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          )}
+                          {!hasTripsForRoute(route.id) && (
+                            <div className="px-4 py-6 text-sm text-gray-500 dark:text-gray-400">Không có chuyến cho tuyến này.</div>
+                          )}
+                          {isManager() && route.isCreate && !route.isDelete && (
+                            <div className="px-4 py-4">
+                              <button
+                                onClick={() => openCreateTrip(route)}
+                                className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700"
+                              >
+                                Thêm chuyến
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
               ))}
             </tbody>
           </table>
@@ -579,6 +766,52 @@ export default function RoutesManagement() {
         route={selectedRoute}
         isDeleting={isDeleting}
       />
+
+      {creatingTripForRoute && newTrip && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/50" onClick={() => { setCreatingTripForRoute(null); setNewTrip(null); }} />
+          <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-xl max-w-lg w-full">
+            <div className="flex items-center justify-between p-5 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Tạo chuyến cho tuyến {creatingTripForRoute.routeId}</h3>
+              <button onClick={() => { setCreatingTripForRoute(null); setNewTrip(null); }} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Thời gian khởi hành</label>
+                <input type="datetime-local" value={new Date(newTrip.timeStart).toISOString().slice(0,16)} onChange={(e) => setNewTrip({ ...newTrip, timeStart: new Date(e.target.value).toISOString() })} className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Thời gian đến</label>
+                <input type="datetime-local" value={new Date(newTrip.timeEnd).toISOString().slice(0,16)} onChange={(e) => setNewTrip({ ...newTrip, timeEnd: new Date(e.target.value).toISOString() })} className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Giá vé (đ)</label>
+                <input type="number" min={0} value={newTrip.price} onChange={(e) => setNewTrip({ ...newTrip, price: parseInt(e.target.value) || 0 })} className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Bus ID</label>
+                  <input type="number" min={1} value={newTrip.busId} onChange={(e) => setNewTrip({ ...newTrip, busId: parseInt(e.target.value) || 0 })} className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Driver ID</label>
+                  <input type="number" min={1} value={newTrip.driverId} onChange={(e) => setNewTrip({ ...newTrip, driverId: parseInt(e.target.value) || 0 })} className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Mô tả</label>
+                <textarea value={newTrip.description} onChange={(e) => setNewTrip({ ...newTrip, description: e.target.value })} rows={3} className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+              </div>
+            </div>
+            <div className="p-5 border-t border-gray-200 dark:border-gray-700 flex justify-end space-x-3">
+              <button onClick={() => { setCreatingTripForRoute(null); setNewTrip(null); }} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600">Hủy</button>
+              <button onClick={submitCreateTrip} className="px-4 py-2 text-sm font-medium text-white bg-pink-600 hover:bg-pink-700 rounded-lg">Tạo chuyến</button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

@@ -36,7 +36,7 @@ const navItems: NavItem[] = [
     icon: <CalenderIcon />,
     name: "Lịch trình",
     subItems: [
-      { name: "Quản lý tuyến", path: "/routes", pro: false },
+      { name: "Quản lý tuyến/ chuyến xe", path: "/routes", pro: false },
     ],
   },
   {

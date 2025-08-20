@@ -49,6 +49,8 @@ export interface CreateRouteRequest {
   routeId: string;
   fromLocation: string;
   toLocation: string;
+  fromLocationId?: number;
+  toLocationId?: number;
   duration: number;
   distance: number;
   description: string;
@@ -60,6 +62,8 @@ export interface UpdateRouteRequest {
   routeId: string;
   fromLocation: string;
   toLocation: string;
+  fromLocationId?: number;
+  toLocationId?: number;
   duration: number;
   distance: number;
   description: string;
@@ -169,6 +173,39 @@ export interface LocationResponse {
   amount: number;
   totalPage: number;
   totalCount: number;
+}
+
+export interface Trip {
+  id: number;
+  tripId: string;
+  fromLocation: string;
+  endLocation: string;
+  timeStart: string;
+  timeEnd: string;
+  price: number;
+  routeId: number;
+  busName: string;
+  description: string;
+  status: number;
+  isDeleted: boolean;
+}
+
+export interface TripResponse {
+  data: Trip[];
+  page: number;
+  amount: number;
+  totalPage: number;
+  totalCount: number;
+}
+
+export interface CreateTripRequest {
+  timeStart: string; // ISO string
+  timeEnd: string;   // ISO string
+  price: number;
+  routeId: number;
+  busId: number;
+  driverId: number;
+  description: string;
 }
 
 export interface Bus {

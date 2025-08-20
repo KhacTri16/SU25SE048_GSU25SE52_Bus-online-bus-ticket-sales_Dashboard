@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { CompanyResponse, RouteResponse, CreateRouteRequest, UpdateRouteRequest, Customer, StationResponse, CreateStationRequest, UpdateStationRequest, Station, RoleResponse, CreateRoleRequest, UpdateRoleRequest, Role, BusResponse, LocationResponse, Company } from '../types/company';
+import { CompanyResponse, RouteResponse, CreateRouteRequest, UpdateRouteRequest, Customer, StationResponse, CreateStationRequest, UpdateStationRequest, Station, RoleResponse, CreateRoleRequest, UpdateRoleRequest, Role, BusResponse, LocationResponse, Company, TripResponse, CreateTripRequest } from '../types/company';
 
 const baseURL = 'https://bobts-server-e7dxfwh7e5g9e3ad.malaysiawest-01.azurewebsites.net';
 
@@ -94,8 +94,16 @@ export const routeService = {
     try {
       const formData = new FormData();
       formData.append('RouteId', routeData.routeId);
-      formData.append('FromLocation', routeData.fromLocation);
-      formData.append('ToLocation', routeData.toLocation);
+      if (routeData.fromLocationId) {
+        formData.append('FromLocationId', routeData.fromLocationId.toString());
+      } else {
+        formData.append('FromLocation', routeData.fromLocation);
+      }
+      if (routeData.toLocationId) {
+        formData.append('ToLocationId', routeData.toLocationId.toString());
+      } else {
+        formData.append('ToLocation', routeData.toLocation);
+      }
       formData.append('Duration', routeData.duration.toString());
       formData.append('Distance', routeData.distance.toString());
       formData.append('Description', routeData.description);
@@ -121,8 +129,16 @@ export const routeService = {
     try {
       const formData = new FormData();
       formData.append('RouteId', routeData.routeId);
-      formData.append('FromLocation', routeData.fromLocation);
-      formData.append('ToLocation', routeData.toLocation);
+      if (routeData.fromLocationId) {
+        formData.append('FromLocationId', routeData.fromLocationId.toString());
+      } else {
+        formData.append('FromLocation', routeData.fromLocation);
+      }
+      if (routeData.toLocationId) {
+        formData.append('ToLocationId', routeData.toLocationId.toString());
+      } else {
+        formData.append('ToLocation', routeData.toLocation);
+      }
       formData.append('Duration', routeData.duration.toString());
       formData.append('Distance', routeData.distance.toString());
       formData.append('Description', routeData.description);
@@ -150,6 +166,16 @@ export const routeService = {
       return response.data;
     } catch (error) {
       console.error('Error deleting route:', error);
+      throw error;
+    }
+  },
+  
+  async activateRoute(id: number): Promise<any> {
+    try {
+      const response = await api.post(`/api/Route/activate/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error activating route:', error);
       throw error;
     }
   },
@@ -346,6 +372,33 @@ export const locationService = {
       return response.data;
     } catch (error) {
       console.error('Error fetching locations:', error);
+      throw error;
+    }
+  },
+};
+
+export const tripService = {
+  async getAllTrips(page: number = 0, amount: number = 100, all: boolean = true): Promise<TripResponse> {
+    try {
+      const response = await api.get<TripResponse>('/api/Trip', {
+        params: {
+          Page: page,
+          Amount: amount,
+          All: all,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching trips:', error);
+      throw error;
+    }
+  },
+  async createTrip(data: CreateTripRequest): Promise<any> {
+    try {
+      const response = await api.post('/api/Trip', data);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating trip:', error);
       throw error;
     }
   },

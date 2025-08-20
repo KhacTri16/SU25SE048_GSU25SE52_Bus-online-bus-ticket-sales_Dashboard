@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { Route, CreateRouteRequest, UpdateRouteRequest, Company } from "../../types/company";
-import { companyService } from "../../services/api";
+import { Route, CreateRouteRequest, UpdateRouteRequest, Company, Location } from "../../types/company";
+import { companyService, locationService } from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
 
 interface RouteFormModalProps {
@@ -17,6 +17,8 @@ export default function RouteFormModal({ isOpen, onClose, onSubmit, route, title
     routeId: '',
     fromLocation: '',
     toLocation: '',
+    fromLocationId: 0,
+    toLocationId: 0,
     duration: 0,
     distance: 0,
     description: '',
@@ -24,6 +26,7 @@ export default function RouteFormModal({ isOpen, onClose, onSubmit, route, title
   });
   const [license, setLicense] = useState<File | undefined>(undefined);
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -31,11 +34,14 @@ export default function RouteFormModal({ isOpen, onClose, onSubmit, route, title
   useEffect(() => {
     if (isOpen) {
       fetchCompanies();
+      fetchLocations();
       if (route) {
         setFormData({
           routeId: route.routeId,
           fromLocation: route.fromLocation,
           toLocation: route.toLocation,
+          fromLocationId: 0,
+          toLocationId: 0,
           duration: route.duration,
           distance: route.distance,
           description: route.description,
@@ -77,12 +83,26 @@ export default function RouteFormModal({ isOpen, onClose, onSubmit, route, title
     }
   };
 
+  const fetchLocations = async () => {
+    try {
+      setLoading(true);
+      const response = await locationService.getAllLocations();
+      setLocations(response.data || []);
+    } catch (error) {
+      console.error('Error fetching locations:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const resetForm = () => {
     const userCompanyId = getUserCompanyId();
     setFormData({
       routeId: '',
       fromLocation: '',
       toLocation: '',
+      fromLocationId: 0,
+      toLocationId: 0,
       duration: 0,
       distance: 0,
       description: '',
@@ -98,11 +118,11 @@ export default function RouteFormModal({ isOpen, onClose, onSubmit, route, title
     if (!formData.routeId.trim()) {
       newErrors.routeId = 'Mã tuyến là bắt buộc';
     }
-    if (!formData.fromLocation.trim()) {
-      newErrors.fromLocation = 'Điểm đi là bắt buộc';
+    if (!formData.fromLocationId) {
+      newErrors.fromLocationId = 'Điểm đi là bắt buộc';
     }
-    if (!formData.toLocation.trim()) {
-      newErrors.toLocation = 'Điểm đến là bắt buộc';
+    if (!formData.toLocationId) {
+      newErrors.toLocationId = 'Điểm đến là bắt buộc';
     }
     if (formData.duration <= 0) {
       newErrors.duration = 'Thời gian phải lớn hơn 0';
@@ -127,9 +147,13 @@ export default function RouteFormModal({ isOpen, onClose, onSubmit, route, title
 
     try {
       setSubmitting(true);
-      const submitData = {
+      const fromLocationName = locations.find(l => l.id === formData.fromLocationId)?.name || '';
+      const toLocationName = locations.find(l => l.id === formData.toLocationId)?.name || '';
+      const submitData: CreateRouteRequest | UpdateRouteRequest = {
         ...formData,
-  license,
+        fromLocation: fromLocationName,
+        toLocation: toLocationName,
+        license,
       };
       await onSubmit(submitData);
       onClose();
@@ -173,7 +197,7 @@ export default function RouteFormModal({ isOpen, onClose, onSubmit, route, title
           <form onSubmit={handleSubmit} className="p-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Mã tuyến */}
-              <div>
+              <div onClick={(e) => e.stopPropagation()}>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Mã tuyến <span className="text-red-500">*</span>
                 </label>
@@ -228,20 +252,23 @@ export default function RouteFormModal({ isOpen, onClose, onSubmit, route, title
               )}
 
               {/* Điểm đi */}
-              <div>
+              <div onClick={(e) => e.stopPropagation()}>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Điểm đi <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="text"
-                  value={formData.fromLocation}
-                  onChange={(e) => setFormData({ ...formData, fromLocation: e.target.value })}
+                <select
+                  value={formData.fromLocationId}
+                  onChange={(e) => setFormData({ ...formData, fromLocationId: parseInt(e.target.value) })}
                   className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white ${
-                    errors.fromLocation ? 'border-red-500' : 'border-gray-300'
+                    (errors as any).fromLocationId ? 'border-red-500' : 'border-gray-300'
                   }`}
-                  placeholder="VD: Hà Nội"
-                />
-                {errors.fromLocation && <p className="mt-1 text-sm text-red-500">{errors.fromLocation}</p>}
+                >
+                  <option value={0}>Chọn điểm đi</option>
+                  {locations.map((loc) => (
+                    <option key={loc.id} value={loc.id}>{loc.name}</option>
+                  ))}
+                </select>
+                {(errors as any).fromLocationId && <p className="mt-1 text-sm text-red-500">{(errors as any).fromLocationId}</p>}
               </div>
 
               {/* Điểm đến */}
@@ -249,16 +276,19 @@ export default function RouteFormModal({ isOpen, onClose, onSubmit, route, title
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Điểm đến <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="text"
-                  value={formData.toLocation}
-                  onChange={(e) => setFormData({ ...formData, toLocation: e.target.value })}
+                <select
+                  value={formData.toLocationId}
+                  onChange={(e) => setFormData({ ...formData, toLocationId: parseInt(e.target.value) })}
                   className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white ${
-                    errors.toLocation ? 'border-red-500' : 'border-gray-300'
+                    (errors as any).toLocationId ? 'border-red-500' : 'border-gray-300'
                   }`}
-                  placeholder="VD: TP. Hồ Chí Minh"
-                />
-                {errors.toLocation && <p className="mt-1 text-sm text-red-500">{errors.toLocation}</p>}
+                >
+                  <option value={0}>Chọn điểm đến</option>
+                  {locations.map((loc) => (
+                    <option key={loc.id} value={loc.id}>{loc.name}</option>
+                  ))}
+                </select>
+                {(errors as any).toLocationId && <p className="mt-1 text-sm text-red-500">{(errors as any).toLocationId}</p>}
               </div>
 
               {/* Thời gian (phút) */}
