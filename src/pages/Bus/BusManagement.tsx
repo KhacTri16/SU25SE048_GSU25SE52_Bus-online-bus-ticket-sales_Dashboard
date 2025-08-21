@@ -162,12 +162,7 @@ const BusManagement: React.FC = () => {
             <button className="px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 text-sm font-medium">
               Thêm xe mới
             </button>
-            <button 
-              onClick={fetchBuses}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
-            >
-              🔄 Làm mới
-            </button>
+            
           </div>
         </div>
 

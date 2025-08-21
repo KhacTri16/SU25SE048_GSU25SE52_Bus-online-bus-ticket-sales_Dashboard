@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { CompanyResponse, RouteResponse, CreateRouteRequest, UpdateRouteRequest, Customer, StationResponse, CreateStationRequest, UpdateStationRequest, Station, RoleResponse, CreateRoleRequest, UpdateRoleRequest, Role, BusResponse, LocationResponse, Company, TripResponse, CreateTripRequest } from '../types/company';
+import { CompanyResponse, RouteResponse, CreateRouteRequest, UpdateRouteRequest, Customer, StationResponse, CreateStationRequest, UpdateStationRequest, Station, RoleResponse, CreateRoleRequest, UpdateRoleRequest, Role, BusResponse, LocationResponse, Company, TripResponse, CreateTripRequest, CreateCompanyRequest, Ticket, CompanySettlement } from '../types/company';
 
 const baseURL = 'https://bobts-server-e7dxfwh7e5g9e3ad.malaysiawest-01.azurewebsites.net';
 
@@ -68,6 +68,54 @@ export const companyService = {
       return response.data;
     } catch (error) {
       console.error('Error fetching company by ID:', error);
+      throw error;
+    }
+  },
+
+  async createCompany(data: CreateCompanyRequest): Promise<Company> {
+    try {
+      const formData = new FormData();
+      // According to backend expects PascalCase keys
+      if (data.companyId !== undefined) formData.append('CompanyId', data.companyId ?? '');
+      if (data.name !== undefined) formData.append('Name', data.name ?? '');
+      if (data.phone !== undefined) formData.append('Phone', data.phone ?? '');
+      if (data.address !== undefined) formData.append('Address', data.address ?? '');
+      if (data.website !== undefined) formData.append('Website', data.website ?? '');
+      if (data.status !== undefined) formData.append('Status', String(data.status ?? 0));
+      if (data.taxNumber !== undefined) formData.append('TaxNumber', data.taxNumber ?? '');
+      if (data.description !== undefined) formData.append('Description', data.description ?? '');
+      if (data.maxPercent !== undefined) formData.append('MaxPercent', String(data.maxPercent ?? 0));
+      if (data.minPercent !== undefined) formData.append('MinPercent', String(data.minPercent ?? 0));
+      if (data.logo) formData.append('Logo', data.logo);
+
+      const response = await api.post<Company>('/api/Company', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error creating company:', error);
+      throw error;
+    }
+  },
+  
+  async createSettlement(companyId: number, period: string): Promise<CompanySettlement> {
+    try {
+      const response = await api.post<CompanySettlement>(`/api/CompanySettlements/${companyId}`, null, {
+        params: { period },
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error creating company settlement:', error);
+      throw error;
+    }
+  },
+
+  async getCompanySettlements(companyId: number): Promise<CompanySettlement[]> {
+    try {
+      const response = await api.get<CompanySettlement[]>(`/api/CompanySettlements/${companyId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching company settlements:', error);
       throw error;
     }
   },
@@ -399,6 +447,32 @@ export const tripService = {
       return response.data;
     } catch (error) {
       console.error('Error creating trip:', error);
+      throw error;
+    }
+  },
+};
+
+// Ticket service
+export const ticketService = {
+  async getAllTickets(): Promise<Ticket[]> {
+    try {
+      const response = await api.get<Ticket[]>('/api/Ticket', {
+        params: {
+          All: true,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching tickets:', error);
+      throw error;
+    }
+  },
+  async cancelTicket(ticketId: number): Promise<string> {
+    try {
+      const response = await api.put<string>(`/api/Ticket/cancel/${ticketId}`);
+      return typeof response.data === 'string' ? response.data : 'Đã hủy vé';
+    } catch (error) {
+      console.error('Error canceling ticket:', error);
       throw error;
     }
   },

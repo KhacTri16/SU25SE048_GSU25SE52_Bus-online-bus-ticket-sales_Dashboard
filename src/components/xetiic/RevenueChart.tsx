@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import ReactApexChart from "react-apexcharts";
 import { useAuth } from "../../context/AuthContext";
-import { paymentService } from "../../services/api";
+import { ticketService, companyService } from "../../services/api";
 
 export default function RevenueChart() {
-  const { getUserCompanyId } = useAuth();
+  const { getUserCompanyId, isAdmin, isCompanyRestricted } = useAuth();
   const [year, setYear] = useState<number>(new Date().getFullYear());
   const [monthlyRevenue, setMonthlyRevenue] = useState<number[]>(Array(12).fill(0));
   const [totalRevenue, setTotalRevenue] = useState<number | null>(null);
@@ -13,19 +13,13 @@ export default function RevenueChart() {
   const options = useMemo(() => ({
     chart: {
       height: 350,
-      type: "area" as const,
-      toolbar: {
-        show: false,
-      },
+      type: "bar" as const,
+      toolbar: { show: false },
     },
     colors: ["#e36666"],
-    dataLabels: {
-      enabled: false,
-    },
-    stroke: {
-      curve: "smooth" as const,
-      width: 3,
-    },
+    plotOptions: { bar: { horizontal: false, columnWidth: "45%" } },
+    dataLabels: { enabled: false },
+    stroke: { show: true, width: 2, colors: ["transparent"] },
     xaxis: {
       categories: [
         "T1", "T2", "T3", "T4", "T5", "T6",
@@ -46,15 +40,7 @@ export default function RevenueChart() {
         formatter: (value: number) => new Intl.NumberFormat('vi-VN').format(value),
       },
     },
-    fill: {
-      type: "gradient",
-      gradient: {
-        shadeIntensity: 1,
-        opacityFrom: 0.4,
-        opacityTo: 0.1,
-        stops: [0, 90, 100],
-      },
-    },
+    fill: { opacity: 0.8 },
     grid: {
       borderColor: "#f1f1f1",
       strokeDashArray: 3,
@@ -75,27 +61,46 @@ export default function RevenueChart() {
 
   useEffect(() => {
     const fetchRevenue = async () => {
-      const companyId = getUserCompanyId();
-      if (!companyId) return;
       setIsLoading(true);
       try {
-        const total = await paymentService.getCompanyTotalRevenue(companyId);
-        setTotalRevenue(total);
+        const tickets = await ticketService.getAllTickets();
 
-        const monthPromises = Array.from({ length: 12 }, (_, idx) =>
-          paymentService.getMonthlyRevenue(companyId, year, idx + 1)
-        );
-        const results = await Promise.all(monthPromises);
-        setMonthlyRevenue(results.map(r => r.revenue || 0));
+        let filtered = tickets;
+        if (!isAdmin() && isCompanyRestricted()) {
+          const cid = getUserCompanyId();
+          if (cid) {
+            try {
+              const company = await companyService.getCompanyById(cid);
+              filtered = tickets.filter(t => t.companyName === company.name);
+            } catch {
+              filtered = [];
+            }
+          } else {
+            filtered = [];
+          }
+        }
+
+        const byYear = filtered.filter(t => new Date(t.timeStart).getFullYear() === year);
+        const monthly = Array(12).fill(0);
+        byYear.forEach(t => {
+          // Count revenue for paid/completed statuses (0: paid, 5: completed)
+          if (t.status === 0 || t.status === 5) {
+            const m = new Date(t.timeStart).getMonth();
+            monthly[m] += t.price || 0;
+          }
+        });
+        setMonthlyRevenue(monthly);
+        setTotalRevenue(monthly.reduce((a, b) => a + b, 0));
       } catch (e) {
         console.error('Error loading revenue', e);
         setMonthlyRevenue(Array(12).fill(0));
+        setTotalRevenue(0);
       } finally {
         setIsLoading(false);
       }
     };
     fetchRevenue();
-  }, [getUserCompanyId, year]);
+  }, [getUserCompanyId, isAdmin, isCompanyRestricted, year]);
 
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
@@ -124,7 +129,7 @@ export default function RevenueChart() {
         <ReactApexChart
           options={options}
           series={series}
-          type="area"
+          type="bar"
           height={350}
         />
       </div>

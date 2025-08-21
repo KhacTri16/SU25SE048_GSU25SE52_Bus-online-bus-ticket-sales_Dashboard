@@ -32,6 +32,7 @@ import DarkModeDemo from "./components/demo/DarkModeDemo";
 import AuthGuard from "./components/auth/AuthGuard";
 import { Component, ReactNode } from "react";
 import RevenueReport from "./pages/Reports/RevenueReport";
+import TicketList from "./pages/Tickets/TicketList";
 
 // Error Boundary Component
 class ErrorBoundary extends Component<
@@ -160,7 +161,14 @@ export default function App() {
 
                           {/* Blocked Routes - Redirect to Dashboard */}
                           <Route path="book-ticket" element={<Navigate to="/" replace />} />
-                          <Route path="tickets" element={<Navigate to="/" replace />} />
+                          <Route
+                            path="tickets"
+                            element={
+                              <AuthGuard requiredPermission="reports.read">
+                                <TicketList />
+                              </AuthGuard>
+                            }
+                          />
                           <Route path="cancel-ticket" element={<Navigate to="/" replace />} />
                           <Route path="schedule" element={<Navigate to="/" replace />} />
                           <Route path="booking-history" element={<Navigate to="/" replace />} />

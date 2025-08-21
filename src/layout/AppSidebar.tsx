@@ -68,6 +68,13 @@ const navItems: NavItem[] = [
       { name: "Doanh thu", path: "/reports/revenue", pro: false },
     ],
   },
+  {
+    name: "Quản lý vé",
+    icon: <TableIcon />,
+    subItems: [
+      { name: "Danh sách vé", path: "/tickets", pro: false },
+    ],
+  },
 ];
 
 const othersItems: NavItem[] = [

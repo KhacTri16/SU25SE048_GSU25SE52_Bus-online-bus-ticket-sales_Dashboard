@@ -274,12 +274,7 @@ const StationList: React.FC = () => {
                 Thêm trạm xe mới
               </button>
             )}
-            <button 
-              onClick={fetchStations}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
-            >
-              🔄 Làm mới
-            </button>
+            
           </div>
         </div>
 

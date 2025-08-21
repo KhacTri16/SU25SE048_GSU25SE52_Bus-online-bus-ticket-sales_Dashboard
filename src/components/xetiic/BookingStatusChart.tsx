@@ -1,13 +1,57 @@
 import ReactApexChart from "react-apexcharts";
+import { useEffect, useState } from "react";
+import { useAuth } from "../../context/AuthContext";
+import { ticketService, companyService } from "../../services/api";
 
 export default function BookingStatusChart() {
-  const series = [68, 23, 9];
+  const { isAdmin, isCompanyRestricted, getUserCompanyId } = useAuth();
+  const [series, setSeries] = useState<number[]>([0, 0, 0]);
+  const [loading, setLoading] = useState<boolean>(false);
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      try {
+        const tickets = await ticketService.getAllTickets();
+        let filtered = tickets;
+        if (!isAdmin() && isCompanyRestricted()) {
+          const cid = getUserCompanyId();
+          if (cid) {
+            try {
+              const company = await companyService.getCompanyById(cid);
+              filtered = tickets.filter(t => t.companyName === company.name);
+            } catch {
+              filtered = [];
+            }
+          } else {
+            filtered = [];
+          }
+        }
+
+        // Map statuses to three buckets for the donut: Confirmed, Pending, Cancelled
+        // Using provided mapping:
+        // 0: Đã thanh toán, 1: Đã điểm danh, 2: Đã Hoàn tiền, 3: Chờ thanh toán, 4: Thất bại, 5: Hoàn thành
+        const confirmed = filtered.filter(t => t.status === 0 || t.status === 1 || t.status === 5).length;
+        const pending = filtered.filter(t => t.status === 3).length;
+        const cancelled = filtered.filter(t => t.status === 2 || t.status === 4).length;
+        const total = confirmed + pending + cancelled || 1;
+        setSeries([
+          Math.round((confirmed / total) * 100),
+          Math.round((pending / total) * 100),
+          Math.round((cancelled / total) * 100),
+        ]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [isAdmin, isCompanyRestricted, getUserCompanyId]);
   const options = {
     chart: {
       type: "donut" as const,
     },
     colors: ["#10b981", "#f59e0b", "#ef4444"],
-    labels: ["Đã xác nhận", "Chờ xử lý", "Đã hủy"],
+    labels: ["Đã xác nhận", "Chờ thanh toán", "Đã hủy/Hoàn tiền"],
     legend: {
       position: "bottom" as const,
     },
@@ -60,7 +104,7 @@ export default function BookingStatusChart() {
             <span className="text-sm text-gray-500 dark:text-gray-400">Đã xác nhận</span>
           </div>
           <p className="text-lg font-semibold text-gray-900 dark:text-white mt-1">
-            68%
+            {series[0]}%
           </p>
         </div>
         <div className="text-center">
@@ -69,7 +113,7 @@ export default function BookingStatusChart() {
             <span className="text-sm text-gray-500 dark:text-gray-400">Chờ xử lý</span>
           </div>
           <p className="text-lg font-semibold text-gray-900 dark:text-white mt-1">
-            23%
+            {series[1]}%
           </p>
         </div>
         <div className="text-center">
@@ -78,7 +122,7 @@ export default function BookingStatusChart() {
             <span className="text-sm text-gray-500 dark:text-gray-400">Đã hủy</span>
           </div>
           <p className="text-lg font-semibold text-gray-900 dark:text-white mt-1">
-            9%
+            {series[2]}%
           </p>
         </div>
       </div>

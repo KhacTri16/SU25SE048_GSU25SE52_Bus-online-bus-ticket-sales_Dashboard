@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Company } from '../../types/company';
+import { Company, CreateCompanyRequest } from '../../types/company';
 import { companyService } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import { Modal } from '../ui/modal';
 
 export default function CompanyList() {
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -9,6 +10,30 @@ export default function CompanyList() {
   const [error, setError] = useState<string | null>(null);
   const [apiInfo, setApiInfo] = useState<{totalCount: number, totalPage: number} | null>(null);
   const { getUserCompanyId, isCompanyRestricted, isAdmin } = useAuth();
+  const [settlingCompany, setSettlingCompany] = useState<number | null>(null);
+  const [periodByCompany, setPeriodByCompany] = useState<Record<number, string>>({});
+  const [settlementResult, setSettlementResult] = useState<{
+    type: 'success' | 'error';
+    company: Company;
+    period: string;
+    data?: any;
+    error?: string;
+  } | null>(null);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [form, setForm] = useState<CreateCompanyRequest>({
+    companyId: '',
+    name: '',
+    phone: '',
+    address: '',
+    website: '',
+    status: 0,
+    taxNumber: '',
+    description: '',
+    maxPercent: 0,
+    minPercent: 0,
+    logo: null,
+  });
 
   useEffect(() => {
     const fetchCompanies = async () => {
@@ -207,40 +232,11 @@ export default function CompanyList() {
           </div>
           <div className="flex gap-2">
             {isAdmin() && (
-              <button className="px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 text-sm font-medium">
+              <button onClick={() => setIsCreateOpen(true)} className="px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 text-sm font-medium">
                 Thêm công ty mới
               </button>
             )}
-            <button 
-              onClick={() => {
-                setLoading(true);
-                setError(null);
-                companyService.getAllCompanies(1, 50)
-                  .then(res => {
-                    let companiesData = res.data || [];
-                    
-                                         // Apply RBAC filtering for manager and staff
-                     if (isCompanyRestricted()) {
-                       const userCompanyId = getUserCompanyId();
-                       if (userCompanyId) {
-                         // Filter by company.id (not company.companyId) since user's companyId matches company.id
-                         companiesData = companiesData.filter(company => company.id === userCompanyId);
-                       }
-                     }
-                    
-                    setCompanies(companiesData);
-                    setApiInfo({totalCount: res.totalCount, totalPage: res.totalPage});
-                    setLoading(false);
-                  })
-                  .catch(err => {
-                    setError(`API Error: ${err.message}`);
-                    setLoading(false);
-                  });
-              }}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
-            >
-              🔄 Test API
-            </button>
+            
           </div>
         </div>
 
@@ -266,6 +262,9 @@ export default function CompanyList() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">
                   Ngày tạo
                 </th>
+                {isAdmin() && (
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">Quyết toán</th>
+                )}
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200 dark:bg-transparent dark:divide-gray-800">
@@ -329,6 +328,56 @@ export default function CompanyList() {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                     {formatDate(company.createAt)}
                   </td>
+                  {isAdmin() && (
+                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <input
+                          type="month"
+                          className="border border-gray-200 rounded-lg px-2 py-1 text-sm dark:border-gray-800 dark:bg-gray-900 dark:text-white"
+                          value={periodByCompany[company.id] || ''}
+                          onChange={(e) => setPeriodByCompany(prev => ({ ...prev, [company.id]: e.target.value }))}
+                        />
+                        <button
+                          className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-xs font-medium disabled:opacity-50"
+                          disabled={settlingCompany === company.id || !(periodByCompany[company.id])}
+                          onClick={async () => {
+                            const period = periodByCompany[company.id];
+                            if (!period) {
+                              setSettlementResult({
+                                type: 'error',
+                                company,
+                                period: '',
+                                error: 'Vui lòng chọn kỳ quyết toán (YYYY-MM)'
+                              });
+                              return;
+                            }
+                            try {
+                              setSettlingCompany(company.id);
+                              const result = await companyService.createSettlement(company.id, period);
+                              
+                              setSettlementResult({
+                                type: 'success',
+                                company,
+                                period,
+                                data: result
+                              });
+                            } catch (err: any) {
+                              setSettlementResult({
+                                type: 'error',
+                                company,
+                                period,
+                                error: err?.response?.data?.message || err.message
+                              });
+                            } finally {
+                              setSettlingCompany(null);
+                            }
+                          }}
+                        >
+                          {settlingCompany === company.id ? 'Đang tạo...' : 'Tạo quyết toán'}
+                        </button>
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -341,6 +390,266 @@ export default function CompanyList() {
           </div>
         )}
       </div>
+
+      {isAdmin() && (
+        <Modal isOpen={isCreateOpen} onClose={() => !creating && setIsCreateOpen(false)} className="max-w-2xl p-6">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Tạo công ty mới</h3>
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              try {
+                setCreating(true);
+                await companyService.createCompany(form);
+                // refresh list
+                setIsCreateOpen(false);
+                setForm({ companyId: '', name: '', phone: '', address: '', website: '', status: 0, taxNumber: '', description: '', maxPercent: 0, minPercent: 0, logo: null });
+                // reload companies by calling existing effect logic
+                setLoading(true);
+                const response = await companyService.getAllCompanies(1, 50);
+                let companiesData = response.data || [];
+                if (isCompanyRestricted()) {
+                  const userCompanyId = getUserCompanyId();
+                  if (userCompanyId) {
+                    companiesData = companiesData.filter(company => company.id === userCompanyId);
+                    if (companiesData.length === 0) {
+                      try {
+                        const specificCompanyResponse = await companyService.getCompanyById(userCompanyId);
+                        if (specificCompanyResponse) {
+                          companiesData = [specificCompanyResponse];
+                        }
+                      } catch {}
+                    }
+                  }
+                }
+                setCompanies(companiesData);
+                setApiInfo({ totalCount: response.totalCount, totalPage: response.totalPage });
+              } catch (err) {
+                console.error('Create company failed:', err);
+                alert('Tạo công ty thất bại. Vui lòng kiểm tra dữ liệu và thử lại.');
+              } finally {
+                setCreating(false);
+                setLoading(false);
+              }
+            }}
+            className="space-y-4"
+          >
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">CompanyId</label>
+                <input value={form.companyId} onChange={(e) => setForm({ ...form, companyId: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 py-2 dark:border-gray-800 dark:bg-gray-900 dark:text-white" placeholder="VD: ABC123" />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Name</label>
+                <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 py-2 dark:border-gray-800 dark:bg-gray-900 dark:text-white" placeholder="Tên công ty" />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Phone</label>
+                <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 py-2 dark:border-gray-800 dark:bg-gray-900 dark:text-white" placeholder="Số điện thoại" />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Address</label>
+                <input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 py-2 dark:border-gray-800 dark:bg-gray-900 dark:text-white" placeholder="Địa chỉ" />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Website</label>
+                <input value={form.website} onChange={(e) => setForm({ ...form, website: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 py-2 dark:border-gray-800 dark:bg-gray-900 dark:text-white" placeholder="https://..." />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Status</label>
+                <select value={form.status ?? 0} onChange={(e) => setForm({ ...form, status: parseInt(e.target.value) })} className="w-full border border-gray-200 rounded-lg px-3 py-2 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                  <option value={0}>0 - Không hoạt động</option>
+                  <option value={1}>1 - Hoạt động</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">TaxNumber</label>
+                <input value={form.taxNumber} onChange={(e) => setForm({ ...form, taxNumber: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 py-2 dark:border-gray-800 dark:bg-gray-900 dark:text-white" placeholder="Mã số thuế" />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">MaxPercent</label>
+                <input type="number" value={form.maxPercent ?? 0} onChange={(e) => setForm({ ...form, maxPercent: parseInt(e.target.value || '0') })} className="w-full border border-gray-200 rounded-lg px-3 py-2 dark:border-gray-800 dark:bg-gray-900 dark:text-white" />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">MinPercent</label>
+                <input type="number" value={form.minPercent ?? 0} onChange={(e) => setForm({ ...form, minPercent: parseInt(e.target.value || '0') })} className="w-full border border-gray-200 rounded-lg px-3 py-2 dark:border-gray-800 dark:bg-gray-900 dark:text-white" />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Description</label>
+                <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 py-2 dark:border-gray-800 dark:bg-gray-900 dark:text-white" rows={3} />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Logo</label>
+                <input type="file" accept="image/*" onChange={(e) => setForm({ ...form, logo: e.target.files && e.target.files[0] ? e.target.files[0] : null })} className="w-full" />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button type="button" disabled={creating} onClick={() => setIsCreateOpen(false)} className="px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-800">
+                Hủy
+              </button>
+              <button type="submit" disabled={creating} className="px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700">
+                {creating ? 'Đang tạo...' : 'Tạo công ty'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* Settlement Result Popup */}
+      {settlementResult && (
+        <Modal 
+          isOpen={true} 
+          onClose={() => setSettlementResult(null)} 
+          className="max-w-lg p-0 overflow-hidden"
+        >
+          {settlementResult.type === 'success' ? (
+            <div className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20">
+              {/* Header */}
+              <div className="px-6 py-4 bg-green-500 text-white">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold">Quyết toán thành công!</h3>
+                    <p className="text-green-100 text-sm">{settlementResult.company.name}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Content */}
+              <div className="px-6 py-6 space-y-4">
+                <div className="bg-white/60 dark:bg-gray-800/60 rounded-lg p-4">
+                  <h4 className="font-medium text-gray-900 dark:text-white mb-3">
+                    📊 Chi tiết quyết toán kỳ {settlementResult.period}
+                  </h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Tổng giao dịch:</span>
+                      <span className="font-medium text-gray-900 dark:text-white">
+                        {settlementResult.data.totalPayments.toLocaleString('vi-VN')} giao dịch
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Doanh thu gộp:</span>
+                      <span className="font-medium text-blue-600 dark:text-blue-400">
+                        {settlementResult.data.grossAmount.toLocaleString('vi-VN')} VND
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Phí hệ thống:</span>
+                      <span className="font-medium text-red-600 dark:text-red-400">
+                        -{settlementResult.data.chargeAmount.toLocaleString('vi-VN')} VND
+                      </span>
+                    </div>
+                    <div className="border-t pt-2 flex justify-between">
+                      <span className="font-medium text-gray-900 dark:text-white">Doanh thu ròng:</span>
+                      <span className="font-bold text-green-600 dark:text-green-400 text-lg">
+                        {settlementResult.data.netAmount.toLocaleString('vi-VN')} VND
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <span className="font-medium text-blue-900 dark:text-blue-100">Báo cáo Excel</span>
+                  </div>
+                  <p className="text-sm text-blue-700 dark:text-blue-300 mb-3">
+                    Báo cáo chi tiết đã được tạo và sẵn sàng tải xuống
+                  </p>
+                  <button
+                    onClick={() => {
+                      window.open(settlementResult.data.excelReportUrl, '_blank');
+                      setSettlementResult(null);
+                    }}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                  >
+                    📥 Tải xuống báo cáo Excel
+                  </button>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="px-6 py-4 bg-gray-50 dark:bg-gray-800/50 flex justify-end">
+                <button
+                  onClick={() => setSettlementResult(null)}
+                  className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 font-medium"
+                >
+                  Đóng
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-900/20 dark:to-rose-900/20">
+              {/* Error Header */}
+              <div className="px-6 py-4 bg-red-500 text-white">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold">Tạo quyết toán thất bại</h3>
+                    <p className="text-red-100 text-sm">{settlementResult.company.name}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Error Content */}
+              <div className="px-6 py-6 space-y-4">
+                <div className="bg-white/60 dark:bg-gray-800/60 rounded-lg p-4">
+                  <h4 className="font-medium text-gray-900 dark:text-white mb-2">
+                    🔍 Chi tiết lỗi
+                  </h4>
+                  <p className="text-sm text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/30 p-3 rounded">
+                    {settlementResult.error}
+                  </p>
+                </div>
+
+                <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-4">
+                  <h4 className="font-medium text-yellow-900 dark:text-yellow-100 mb-2 flex items-center gap-2">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    💡 Gợi ý khắc phục
+                  </h4>
+                  <ul className="text-sm text-yellow-800 dark:text-yellow-200 space-y-1">
+                    <li>• Kiểm tra lại kỳ quyết toán đã chọn ({settlementResult.period})</li>
+                    <li>• Đảm bảo có dữ liệu giao dịch trong kỳ này</li>
+                    <li>• Thử lại sau ít phút</li>
+                    <li>• Liên hệ bộ phận kỹ thuật nếu lỗi vẫn tiếp tục</li>
+                  </ul>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="px-6 py-4 bg-gray-50 dark:bg-gray-800/50 flex justify-end gap-2">
+                <button
+                  onClick={() => setSettlementResult(null)}
+                  className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 font-medium"
+                >
+                  Đóng
+                </button>
+                <button
+                  onClick={() => {
+                    setSettlementResult(null);
+                    // Optionally trigger the settlement again
+                  }}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg"
+                >
+                  Thử lại
+                </button>
+              </div>
+            </div>
+          )}
+        </Modal>
+      )}
     </div>
   );
 }

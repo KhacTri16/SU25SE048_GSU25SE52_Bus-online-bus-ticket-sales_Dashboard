@@ -225,3 +225,50 @@ export interface BusResponse {
   totalPage: number;
   totalCount: number;
 }
+
+// Create Company Request payload (for multipart/form-data)
+export interface CreateCompanyRequest {
+  companyId?: string;
+  name?: string;
+  phone?: string;
+  address?: string;
+  website?: string;
+  status?: number; // 0 or 1
+  taxNumber?: string;
+  description?: string;
+  maxPercent?: number;
+  minPercent?: number;
+  logo?: File | null;
+}
+
+// Ticket types
+export interface Ticket {
+  id: number;
+  ticketId: string;
+  reservationId: number;
+  customerName: string;
+  seatId: string;
+  price: number;
+  createDate: string;
+  fromTripStation: string;
+  toTripStation: string;
+  timeStart: string;
+  timeEnd: string;
+  qrCodeUrl: string;
+  companyName: string;
+  status: number;
+}
+
+// Company settlement response
+export interface CompanySettlement {
+  id: number;
+  companyId: number;
+  period: string; // ISO date string (first day of month)
+  grossAmount: number;
+  netAmount: number;
+  chargeAmount: number;
+  totalPayments: number;
+  status: number;
+  createdAt: string;
+  excelReportUrl: string;
+}

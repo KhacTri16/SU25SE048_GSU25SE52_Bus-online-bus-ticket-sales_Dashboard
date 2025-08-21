@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import ReactApexChart from "react-apexcharts";
 import PageMeta from "../../components/common/PageMeta";
 import { useAuth } from "../../context/AuthContext";
-import { paymentService, CompanyRevenueData } from "../../services/api";
+import { paymentService, CompanyRevenueData, companyService, ticketService } from "../../services/api";
+import { CompanySettlement } from "../../types/company";
 
 export default function RevenueReport() {
   const authContext = useAuth();
@@ -11,11 +12,14 @@ export default function RevenueReport() {
   const [monthlyRevenue, setMonthlyRevenue] = useState<number[]>(Array(12).fill(0));
   const [totalRevenue, setTotalRevenue] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [companyName, setCompanyName] = useState<string>("");
   
   // Admin-specific states
   const [allCompaniesData, setAllCompaniesData] = useState<CompanyRevenueData[]>([]);
   const [systemTotalRevenue, setSystemTotalRevenue] = useState<number | null>(null);
   const [loadingDetailedData, setLoadingDetailedData] = useState<boolean>(false);
+  const [settlements, setSettlements] = useState<CompanySettlement[] | null>(null);
+  const [loadingSettlements, setLoadingSettlements] = useState<boolean>(false);
 
   const options = useMemo(() => ({
     chart: { type: "bar" as const, toolbar: { show: false } },
@@ -41,7 +45,6 @@ export default function RevenueReport() {
       setIsLoading(true);
       try {
         if (isAdmin()) {
-          // Admin: First get the total revenue quickly
           console.log('Admin user detected, fetching total revenue...');
           try {
             const simpleRevenueData = await paymentService.getAllCompaniesRevenue();
@@ -108,26 +111,56 @@ export default function RevenueReport() {
           console.log(`Fetching revenue for company ${companyId} (user role: ${authContext.user?.roleId})`);
           
           try {
-            // Get company total revenue
-            console.log(`Calling API: /api/Payment/company/revenue/total?companyId=${companyId}`);
-            const total = await paymentService.getCompanyTotalRevenue(companyId);
-            console.log(`Company ${companyId} total revenue response:`, total, typeof total);
-            
-            setTotalRevenue(total);
+            // Fetch company name for display
+            try {
+              const company = await companyService.getCompanyById(companyId);
+              setCompanyName(company.name);
+            } catch (nameErr) {
+              console.warn('Could not fetch company name:', nameErr);
+              setCompanyName("");
+            }
 
-            // Get monthly revenue data
-            console.log(`Fetching monthly revenue for company ${companyId}, year ${year}`);
-            const monthPromises = Array.from({ length: 12 }, (_, idx) =>
-              paymentService.getMonthlyRevenue(companyId, year, idx + 1)
-            );
-            const results = await Promise.all(monthPromises);
-            const monthlyData = results.map((r) => r.revenue || 0);
-            setMonthlyRevenue(monthlyData);
-            console.log(`Company ${companyId} monthly revenue:`, monthlyData);
+            // Compute total and monthly revenue from tickets (remove monthly API calls)
+            const tickets = await ticketService.getAllTickets();
+            let filtered = tickets;
+            try {
+              const company = await companyService.getCompanyById(companyId);
+              filtered = tickets.filter(t => t.companyName === company.name);
+            } catch {}
+
+            const byYear = filtered.filter(t => new Date(t.timeStart).getFullYear() === year);
+            const monthly = Array(12).fill(0);
+            let computedTotal = 0;
+            byYear.forEach(t => {
+              // Count revenue for paid or completed statuses
+              if (t.status === 0 || t.status === 5) {
+                const m = new Date(t.timeStart).getMonth();
+                monthly[m] += t.price || 0;
+                computedTotal += t.price || 0;
+              }
+            });
+            setMonthlyRevenue(monthly);
+            setTotalRevenue(computedTotal);
+            console.log(`Company ${companyId} monthly revenue (computed):`, monthly);
+
+            // Fetch settlements for this company (Manager view)
+            try {
+              setLoadingSettlements(true);
+              const list = await companyService.getCompanySettlements(companyId);
+              // sort by createdAt desc
+              list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+              setSettlements(list);
+            } catch (settleErr) {
+              console.warn('Could not load settlements:', settleErr);
+              setSettlements([]);
+            } finally {
+              setLoadingSettlements(false);
+            }
           } catch (error) {
             console.error(`Error fetching revenue for company ${companyId}:`, error);
             setTotalRevenue(0);
             setMonthlyRevenue(Array(12).fill(0));
+            setSettlements([]);
           }
         }
       } catch (err) {
@@ -136,6 +169,7 @@ export default function RevenueReport() {
         setAllCompaniesData([]);
         setSystemTotalRevenue(null);
         setTotalRevenue(null);
+        setSettlements([]);
       } finally {
         setIsLoading(false);
       }
@@ -242,6 +276,72 @@ export default function RevenueReport() {
         </div>
       )}
 
+      {/* Manager/Staff: Company Settlements */}
+      {!isAdmin() && settlements && (
+        <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Quyết toán công ty</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Danh sách kỳ quyết toán của công ty bạn</p>
+            </div>
+          </div>
+
+          {loadingSettlements ? (
+            <div className="py-12 flex items-center justify-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-600 mr-3"></div>
+              <span className="text-gray-600 dark:text-gray-400">Đang tải quyết toán...</span>
+            </div>
+          ) : settlements.length === 0 ? (
+            <div className="py-12 text-center text-gray-500 dark:text-gray-400">
+              Chưa có quyết toán nào
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
+                <thead className="bg-gray-50 dark:bg-gray-900/50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">Kỳ</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">Giao dịch</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">Doanh thu gộp</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">Phí hệ thống</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">Doanh thu ròng</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">Tải xuống</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
+                  {settlements.map(item => (
+                    <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                        {new Date(item.period).toLocaleDateString('vi-VN', { year: 'numeric', month: '2-digit' })}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900 dark:text-white">
+                        {item.totalPayments.toLocaleString('vi-VN')}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-blue-600 dark:text-blue-400">
+                        {item.grossAmount.toLocaleString('vi-VN')} VND
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-red-600 dark:text-red-400">
+                        -{item.chargeAmount.toLocaleString('vi-VN')} VND
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-semibold text-green-600 dark:text-green-400">
+                        {item.netAmount.toLocaleString('vi-VN')} VND
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right">
+                        <button
+                          onClick={() => window.open(item.excelReportUrl, '_blank')}
+                          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded-lg"
+                        >
+                          Tải Excel
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
 
 
@@ -262,7 +362,7 @@ export default function RevenueReport() {
                   </div>
                   <div>
                     <h4 className="text-lg font-semibold text-gray-900 dark:text-white">Công ty của bạn</h4>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">ID: {getUserCompanyId()}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Công ty: {companyName || 'Đang tải...'}</p>
                   </div>
                 </div>
               </div>
