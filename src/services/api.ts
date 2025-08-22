@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { CompanyResponse, RouteResponse, CreateRouteRequest, UpdateRouteRequest, Customer, StationResponse, CreateStationRequest, UpdateStationRequest, Station, RoleResponse, CreateRoleRequest, UpdateRoleRequest, Role, BusResponse, LocationResponse, Company, TripResponse, CreateTripRequest, CreateCompanyRequest, Ticket, CompanySettlement, CreateTypeBusWithDiagramRequest, CreateTypeBusWithDiagramResponse, BusType, BusTypeResponse, CreateBusRequest, TripStation, CreateTripStationRequest } from '../types/company';
+import { CompanyResponse, RouteResponse, CreateRouteRequest, UpdateRouteRequest, Customer, StationResponse, CreateStationRequest, UpdateStationRequest, Station, RoleResponse, CreateRoleRequest, UpdateRoleRequest, Role, BusResponse, LocationResponse, Company, TripResponse, CreateTripRequest, CreateCompanyRequest, Ticket, CompanySettlement, CreateTypeBusWithDiagramRequest, CreateTypeBusWithDiagramResponse, BusTypeResponse, CreateBusRequest, TripStation, CreateTripStationRequest } from '../types/company';
 
 const baseURL = 'https://bobts-server-e7dxfwh7e5g9e3ad.malaysiawest-01.azurewebsites.net';
 
