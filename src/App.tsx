@@ -33,6 +33,7 @@ import AuthGuard from "./components/auth/AuthGuard";
 import { Component, ReactNode } from "react";
 import RevenueReport from "./pages/Reports/RevenueReport";
 import TicketList from "./pages/Tickets/TicketList";
+import DriverTrips from "./pages/Driver/DriverTrips";
 
 // Error Boundary Component
 class ErrorBoundary extends Component<
@@ -106,6 +107,7 @@ export default function App() {
 
                           {/* Routes Management */}
                           <Route path="routes" element={<RoutesManagement />} />
+                          <Route path="driver-trips" element={<DriverTrips />} />
 
                           {/* Bus Management moved under company; schedule route removed */}
 

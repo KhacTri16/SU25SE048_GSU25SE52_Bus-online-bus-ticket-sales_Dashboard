@@ -16,19 +16,4 @@ export default defineConfig({
       },
     }),
   ],
-  build: {
-    outDir: 'dist',
-    sourcemap: false,
-    minify: 'esbuild',
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom'],
-          charts: ['apexcharts', 'react-apexcharts'],
-          ui: ['@fullcalendar/react', '@react-jvectormap/core'],
-        },
-      },
-    },
-    chunkSizeWarningLimit: 1000,
-  },
 });

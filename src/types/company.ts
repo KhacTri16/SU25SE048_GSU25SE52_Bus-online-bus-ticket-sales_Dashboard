@@ -259,6 +259,28 @@ export interface Ticket {
   status: number;
 }
 
+// Trip Station
+export interface TripStation {
+  id: number;
+  tripStationId: string;
+  tripId: number;
+  stationName: string;
+  price: number;
+  status: number;
+  pickUpTime: string; // ISO
+  description: string;
+}
+
+// Create Trip Station Request
+export interface CreateTripStationRequest {
+  tripStationId: string;
+  tripId: number;
+  stationId: number;
+  price: number;
+  pickUpTime: string; // ISO
+  description: string;
+}
+
 // Company settlement response
 export interface CompanySettlement {
   id: number;
@@ -271,4 +293,84 @@ export interface CompanySettlement {
   status: number;
   createdAt: string;
   excelReportUrl: string;
+}
+
+// TypeBus + Diagram
+export interface SeatPosition {
+  floorIndex: number;
+  rowIndex: number;
+  colIndex: number;
+}
+
+export interface SeatDiagramRequest {
+  name: string;
+  row: number;
+  column: number;
+  selectedSeats: SeatPosition[];
+}
+
+export interface CreateTypeBusWithDiagramRequest {
+  name: string;
+  numberOfSeat: number;
+  numberOfFloors: number;
+  description: string;
+  seatDiagram: SeatDiagramRequest;
+}
+
+export interface TypeBusDiagramDetail {
+  floorIndex: number;
+  rowIndex: number;
+  colIndex: number;
+  isSeat: boolean;
+  seatCode: string;
+}
+
+export interface TypeBusDiagramResponse {
+  id: number;
+  name: string;
+  row: number;
+  column: number;
+  typeBusId: number;
+  details: TypeBusDiagramDetail[];
+}
+
+export interface CreateTypeBusWithDiagramResponse {
+  id: number;
+  typeBusId: string;
+  name: string;
+  numberOfSeat: number;
+  numberOfFloors: number;
+  description: string;
+  status: number;
+  diagram: TypeBusDiagramResponse;
+}
+
+// Bus Type
+export interface BusType {
+  id: number;
+  typeBusId: string;
+  name: string;
+  numberOfSeat: number;
+  numberOfFloors: number;
+  description: string;
+  status: number;
+  isDeleted?: boolean;
+}
+
+export interface BusTypeResponse {
+  data: BusType[];
+  page: number;
+  amount: number;
+  totalPage: number;
+  totalCount: number;
+}
+
+// Updated Bus creation request
+export interface CreateBusRequest {
+  name: string;
+  numberPlate: string;
+  typeBusId: number;
+  companyId: number;
+  brand: string;
+  amentity: string;
 }

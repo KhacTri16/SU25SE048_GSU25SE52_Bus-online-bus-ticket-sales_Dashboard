@@ -16,6 +16,7 @@ import {
   GroupIcon,
 } from "../icons";
 import { useSidebar } from "../context/SidebarContext";
+import { useAuth } from "../context/AuthContext";
 import SidebarWidget from "./SidebarWidget";
 
 type NavItem = {
@@ -37,6 +38,7 @@ const navItems: NavItem[] = [
     name: "Lịch trình",
     subItems: [
       { name: "Quản lý tuyến/ chuyến xe", path: "/routes", pro: false },
+      { name: "Chuyến của tài xế", path: "/driver-trips", pro: false },
     ],
   },
   {

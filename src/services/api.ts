@@ -1,7 +1,7 @@
 import axios from 'axios';
-import { CompanyResponse, RouteResponse, CreateRouteRequest, UpdateRouteRequest, Customer, StationResponse, CreateStationRequest, UpdateStationRequest, Station, RoleResponse, CreateRoleRequest, UpdateRoleRequest, Role, BusResponse, LocationResponse, Company, TripResponse, CreateTripRequest, CreateCompanyRequest, Ticket, CompanySettlement } from '../types/company';
+import { CompanyResponse, RouteResponse, CreateRouteRequest, UpdateRouteRequest, Customer, StationResponse, CreateStationRequest, UpdateStationRequest, Station, RoleResponse, CreateRoleRequest, UpdateRoleRequest, Role, BusResponse, LocationResponse, Company, TripResponse, CreateTripRequest, CreateCompanyRequest, Ticket, CompanySettlement, CreateTypeBusWithDiagramRequest, CreateTypeBusWithDiagramResponse, BusType, BusTypeResponse, CreateBusRequest, TripStation, CreateTripStationRequest } from '../types/company';
 
-const baseURL = import.meta.env.VITE_API_BASE_URL || 'https://bobts-server-e7dxfwh7e5g9e3ad.malaysiawest-01.azurewebsites.net';
+const baseURL = 'https://bobts-server-e7dxfwh7e5g9e3ad.malaysiawest-01.azurewebsites.net';
 
 const api = axios.create({
   baseURL,
@@ -378,7 +378,7 @@ export const busService = {
     }
   },
 
-  async createBus(busData: { name: string; numberPlate: string; typeBusId: number; companyId: number }): Promise<any> {
+  async createBus(busData: CreateBusRequest): Promise<any> {
     try {
       const response = await api.post('/api/Bus', busData);
       return response.data;
@@ -388,7 +388,7 @@ export const busService = {
     }
   },
 
-  async updateBus(id: number, busData: { name: string; numberPlate: string; typeBusId: number; companyId: number }): Promise<any> {
+  async updateBus(id: number, busData: CreateBusRequest): Promise<any> {
     try {
       const response = await api.put(`/api/Bus/${id}`, busData);
       return response.data;
@@ -404,6 +404,32 @@ export const busService = {
       return response.data;
     } catch (error) {
       console.error('Error deleting bus:', error);
+      throw error;
+    }
+  },
+};
+
+export const typeBusService = {
+  async getAllTypeBuses(): Promise<BusTypeResponse> {
+    try {
+      const response = await api.get<BusTypeResponse>('/api/TypeBus', {
+        params: { All: true }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching type buses:', error);
+      throw error;
+    }
+  },
+  async createTypeBusWithDiagram(data: CreateTypeBusWithDiagramRequest): Promise<CreateTypeBusWithDiagramResponse> {
+    try {
+      const response = await api.post<CreateTypeBusWithDiagramResponse>(
+        '/api/TypeBus/create-bus-with-diagram',
+        data
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error creating type bus with diagram:', error);
       throw error;
     }
   },
@@ -441,6 +467,17 @@ export const tripService = {
       throw error;
     }
   },
+  async getTripsByDriver(driverId: number, page: number = 0, amount: number = 100, all: boolean = true): Promise<TripResponse> {
+    try {
+      const response = await api.get<TripResponse>(`/api/Trip/by-driver/${driverId}`, {
+        params: { Page: page, Amount: amount, All: all },
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching trips by driver:', error);
+      throw error;
+    }
+  },
   async createTrip(data: CreateTripRequest): Promise<any> {
     try {
       const response = await api.post('/api/Trip', data);
@@ -450,6 +487,40 @@ export const tripService = {
       throw error;
     }
   },
+};
+
+export const tripStationService = {
+  async getTripStationById(id: number): Promise<TripStation> {
+    try {
+      const response = await api.get<TripStation>(`/api/TripStation/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching trip station:', error);
+      throw error;
+    }
+  },
+  async getAllTripStations(): Promise<{ data: TripStation[] }> {
+    try {
+      const response = await api.get<{ data: TripStation[] }>('/api/TripStation', {
+        params: {
+          All: true
+        }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching all trip stations:', error);
+      throw error;
+    }
+  },
+  async createTripStation(data: CreateTripStationRequest): Promise<any> {
+    try {
+      const response = await api.post('/api/TripStation', data);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating trip station:', error);
+      throw error;
+    }
+  }
 };
 
 // Ticket service

@@ -1,6 +1,6 @@
 import { useState, useEffect, Fragment } from "react";
-import { Route, CreateRouteRequest, UpdateRouteRequest, Trip, CreateTripRequest } from "../../types/company";
-import { routeService, companyService, tripService } from "../../services/api";
+import { Route, CreateRouteRequest, UpdateRouteRequest, Trip, CreateTripRequest, Bus, Station, TripStation } from "../../types/company";
+import { routeService, companyService, tripService, busService, systemUserService, SystemUser, tripStationService, stationService } from "../../services/api";
 import PageMeta from "../../components/common/PageMeta";
 import RouteFormModal from "../../components/Routes/RouteFormModal";
 import DeleteConfirmModal from "../../components/Routes/DeleteConfirmModal";
@@ -30,10 +30,88 @@ export default function RoutesManagement() {
   const [expandedRoutes, setExpandedRoutes] = useState<Record<number, boolean>>({});
   const [creatingTripForRoute, setCreatingTripForRoute] = useState<Route | null>(null);
   const [newTrip, setNewTrip] = useState<CreateTripRequest | null>(null);
+  const [buses, setBuses] = useState<Bus[]>([]);
+  const [drivers, setDrivers] = useState<SystemUser[]>([]);
+  const [expandedTripIds, setExpandedTripIds] = useState<Record<number, boolean>>({});
+  const [tripStationByTripId, setTripStationByTripId] = useState<Record<number, { loading: boolean; error?: string | null; station?: { id: number; name: string; price: number; time: string; description: string } | null }>>({});
+  
+  // Trip Station Creation Modal
+  const [isTripStationModalOpen, setIsTripStationModalOpen] = useState(false);
+  const [creatingStationForTrip, setCreatingStationForTrip] = useState<Trip | null>(null);
+  const [newTripStation, setNewTripStation] = useState<{
+    tripStationId: string;
+    tripId: number;
+    stationId: number;
+    price: number;
+    pickUpTime: string;
+    description: string;
+  } | null>(null);
+  const [tripStations, setTripStations] = useState<TripStation[]>([]);
 
   useEffect(() => {
     fetchRoutes();
   }, [currentPage]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await busService.getAllBuses();
+        let list = (res.data || []).filter(b => !b.isDeleted);
+        if (isCompanyRestricted()) {
+          const userCompanyId = getUserCompanyId();
+          if (userCompanyId) {
+            try {
+              const companiesResponse = await companyService.getAllCompanies(1, 100);
+              const userCompany = companiesResponse.data.find(c => c.id === userCompanyId);
+              if (userCompany) {
+                let filtered = list.filter(b => b.companyName === userCompany.name);
+                if (filtered.length === 0) {
+                  filtered = list.filter(b =>
+                    (b.companyName || '').toLowerCase().includes(userCompany.name.toLowerCase()) ||
+                    userCompany.name.toLowerCase().includes((b.companyName || '').toLowerCase())
+                  );
+                }
+                if (filtered.length > 0) list = filtered;
+              }
+            } catch (e) {
+              console.warn('Could not filter buses by company; falling back to all.');
+            }
+          }
+        }
+        setBuses(list);
+      } catch (e) {
+        console.error('Error fetching buses for trip dropdown:', e);
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await systemUserService.getAllUsers();
+        let list: SystemUser[] = (res.data || []).filter(u => u.roleId === 4 && !u.isDeleted && u.isActive);
+        const userCompanyId = getUserCompanyId();
+        if (userCompanyId) {
+          list = list.filter(u => u.companyId === userCompanyId);
+        }
+        setDrivers(list);
+      } catch (e) {
+        console.error('Error fetching drivers for trip dropdown:', e);
+      }
+    })();
+  }, []);
+
+  // Fetch stations for trip station creation
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await tripStationService.getAllTripStations();
+        setTripStations(res.data || []);
+      } catch (e) {
+        console.error('Error fetching trip stations for trip station creation:', e);
+      }
+    })();
+  }, []);
 
   const fetchRoutes = async () => {
     try {
@@ -294,6 +372,56 @@ export default function RoutesManagement() {
     setIsFormModalOpen(false);
     setIsDeleteModalOpen(false);
     setSelectedRoute(null);
+    setIsDeleting(false);
+    setIsTripStationModalOpen(false);
+    setCreatingStationForTrip(null);
+    setNewTripStation(null);
+  };
+
+  const openCreateTripStation = (trip: Trip) => {
+    setCreatingStationForTrip(trip);
+    setNewTripStation({
+      tripStationId: '',
+      tripId: trip.id,
+      stationId: 0,
+      price: 0,
+      pickUpTime: new Date().toISOString(),
+      description: ''
+    });
+    setIsTripStationModalOpen(true);
+  };
+
+  const handleCreateTripStation = async () => {
+    if (!newTripStation || !creatingStationForTrip) return;
+    
+    try {
+      await tripStationService.createTripStation(newTripStation);
+      showMessage('Tạo trạm cho chuyến thành công!', 'success');
+      closeModals();
+      // Refresh the trip station data
+      setTripStationByTripId(prev => ({ ...prev, [creatingStationForTrip.id]: { loading: true } }));
+      try {
+        const station = await tripStationService.getTripStationById(creatingStationForTrip.id);
+        setTripStationByTripId(prev => ({
+          ...prev,
+          [creatingStationForTrip.id]: {
+            loading: false,
+            station: {
+              id: station.id,
+              name: station.stationName,
+              price: station.price,
+              time: station.pickUpTime,
+              description: station.description,
+            }
+          }
+        }));
+      } catch (e) {
+        setTripStationByTripId(prev => ({ ...prev, [creatingStationForTrip.id]: { loading: false, error: 'Không tìm thấy trạm của chuyến đi này.' } }));
+      }
+    } catch (e) {
+      console.error('Error creating trip station:', e);
+      showMessage('Không thể tạo trạm cho chuyến. Vui lòng thử lại.', 'error');
+    }
   };
 
   const filteredRoutes = routes.filter(route =>
@@ -321,6 +449,20 @@ export default function RoutesManagement() {
     return `${distance} km`;
   };
 
+
+  // Local datetime helpers (no manual timezone math)
+  const pad2 = (n: number) => (n < 10 ? `0${n}` : `${n}`);
+  const formatDateTimeLocal = (isoString: string) => {
+    const d = new Date(isoString);
+    const yyyy = d.getFullYear();
+    const mm = pad2(d.getMonth() + 1);
+    const dd = pad2(d.getDate());
+    const hh = pad2(d.getHours());
+    const mi = pad2(d.getMinutes());
+    return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+  };
+  const localDateTimeToISO = (localValue: string) => new Date(localValue).toISOString();
+
   const getStatusBadge = (route: Route) => {
     if (route.isDelete) {
       return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400">Đã xóa</span>;
@@ -338,6 +480,111 @@ export default function RoutesManagement() {
   const hasTripsForRoute = (routeId: number): boolean => {
     const trips = getTripsForRoute(routeId);
     return trips.length > 0;
+  };
+
+  const toggleTripExpand = async (trip: Trip) => {
+    setExpandedTripIds(prev => ({ ...prev, [trip.id]: !prev[trip.id] }));
+    // Load station info on first expand
+    if (!tripStationByTripId[trip.id]) {
+      setTripStationByTripId(prev => ({ ...prev, [trip.id]: { loading: true } }));
+      try {
+        // API requires TripStation id; using example pattern, try trip.id directly
+        const station = await tripStationService.getTripStationById(trip.id);
+        setTripStationByTripId(prev => ({
+          ...prev,
+          [trip.id]: {
+            loading: false,
+            station: {
+              id: station.id,
+              name: station.stationName,
+              price: station.price,
+              time: station.pickUpTime,
+              description: station.description,
+            }
+          }
+        }));
+      } catch (e) {
+        setTripStationByTripId(prev => ({ ...prev, [trip.id]: { loading: false, error: 'Không tìm thấy trạm của chuyến đi này.' } }));
+      }
+    }
+  };
+
+  const TripRow = ({ trip }: { trip: Trip }) => {
+    const isOpen = !!expandedTripIds[trip.id];
+    const stationInfo = tripStationByTripId[trip.id];
+    return (
+      <>
+        <tr className="hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+          <td className="px-4 py-2 text-sm text-gray-900 dark:text-white">
+            <button onClick={() => toggleTripExpand(trip)} title={isOpen ? 'Ẩn trạm' : 'Xem trạm'} className="mr-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200">
+              <svg className={`h-4 w-4 transform transition-transform ${isOpen ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/></svg>
+            </button>
+            {trip.tripId}
+          </td>
+          <td className="px-4 py-2 text-sm text-gray-900 dark:text-white">{trip.fromLocation} → {trip.endLocation}</td>
+          <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300">{new Date(trip.timeStart).toLocaleString('vi-VN')}</td>
+          <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300">{new Date(trip.timeEnd).toLocaleString('vi-VN')}</td>
+          <td className="px-4 py-2 text-sm text-gray-900 dark:text-white">{trip.price.toLocaleString('vi-VN')} đ</td>
+          <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300">{trip.busName}</td>
+          <td className="px-4 py-2">
+            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${trip.status === 1 ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400' : 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400'}`}>
+              {trip.status === 1 ? 'Hoạt động' : 'Tạm dừng'}
+            </span>
+          </td>
+        </tr>
+        {isOpen && (
+          <tr>
+            <td colSpan={7} className="bg-gray-50 dark:bg-gray-900/30">
+              <div className="px-6 py-3 text-sm">
+                {!stationInfo || stationInfo.loading ? (
+                  <div className="flex items-center text-gray-600 dark:text-gray-400">
+                    <svg className="animate-spin h-4 w-4 mr-2" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                    Đang tải trạm...
+                  </div>
+                ) : stationInfo.error ? (
+                  <div className="flex items-center justify-between">
+                    <div className="text-red-600 dark:text-red-400">{stationInfo.error}</div>
+                  </div>
+                ) : stationInfo.station ? (
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div>
+                      <div className="text-gray-500 dark:text-gray-400">Trạm</div>
+                      <div className="font-medium text-gray-900 dark:text-white">{stationInfo.station.name}</div>
+                    </div>
+                    <div>
+                      <div className="text-gray-500 dark:text-gray-400">Giá</div>
+                      <div className="font-medium text-gray-900 dark:text-white">{stationInfo.station.price.toLocaleString('vi-VN')} đ</div>
+                    </div>
+                    <div>
+                      <div className="text-gray-500 dark:text-gray-400">Giờ đón</div>
+                      <div className="font-medium text-gray-900 dark:text-white">{new Date(stationInfo.station.time).toLocaleString('vi-VN')}</div>
+                    </div>
+                    <div>
+                      <div className="text-gray-500 dark:text-gray-400">Mô tả</div>
+                      <div className="font-medium text-gray-900 dark:text-white">{stationInfo.station.description}</div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between">
+                    <div className="text-gray-600 dark:text-gray-400">Chưa có trạm cho chuyến này</div>
+                  </div>
+                )}
+                {isManager() && (
+                  <div className="mt-3 flex justify-end">
+                    <button
+                      onClick={() => openCreateTripStation(trip)}
+                      className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+                    >
+                      Thêm trạm
+                    </button>
+                  </div>
+                )}
+              </div>
+            </td>
+          </tr>
+        )}
+      </>
+    );
   };
 
   const handleApproveRoute = async (route: Route) => {
@@ -657,19 +904,7 @@ export default function RoutesManagement() {
                               </thead>
                               <tbody className="bg-white divide-y divide-gray-200 dark:bg-transparent dark:divide-gray-800">
                                 {getTripsForRoute(route.id).map(trip => (
-                                  <tr key={trip.id}>
-                                    <td className="px-4 py-2 text-sm text-gray-900 dark:text-white">{trip.tripId}</td>
-                                    <td className="px-4 py-2 text-sm text-gray-900 dark:text-white">{trip.fromLocation} → {trip.endLocation}</td>
-                                    <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300">{new Date(trip.timeStart).toLocaleString('vi-VN')}</td>
-                                    <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300">{new Date(trip.timeEnd).toLocaleString('vi-VN')}</td>
-                                    <td className="px-4 py-2 text-sm text-gray-900 dark:text-white">{trip.price.toLocaleString('vi-VN')} đ</td>
-                                    <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300">{trip.busName}</td>
-                                    <td className="px-4 py-2">
-                                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${trip.status === 1 ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400' : 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400'}`}>
-                                        {trip.status === 1 ? 'Hoạt động' : 'Tạm dừng'}
-                                      </span>
-                                    </td>
-                                  </tr>
+                                  <TripRow key={trip.id} trip={trip} />
                                 ))}
                               </tbody>
                             </table>
@@ -772,11 +1007,29 @@ export default function RoutesManagement() {
             <div className="p-5 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Thời gian khởi hành</label>
-                <input type="datetime-local" value={new Date(newTrip.timeStart).toISOString().slice(0,16)} onChange={(e) => setNewTrip({ ...newTrip, timeStart: new Date(e.target.value).toISOString() })} className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                <input
+                  type="datetime-local"
+                  value={formatDateTimeLocal(newTrip.timeStart)}
+                  min={formatDateTimeLocal(new Date().toISOString())}
+                  onChange={(e) => setNewTrip({ ...newTrip, timeStart: localDateTimeToISO(e.target.value) })}
+                  className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                />
+                {new Date(newTrip.timeStart).getTime() < Date.now() && (
+                  <div className="text-xs text-red-500 mt-1">Thời gian khởi hành không được ở quá khứ.</div>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Thời gian đến</label>
-                <input type="datetime-local" value={new Date(newTrip.timeEnd).toISOString().slice(0,16)} onChange={(e) => setNewTrip({ ...newTrip, timeEnd: new Date(e.target.value).toISOString() })} className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                <input
+                  type="datetime-local"
+                  value={formatDateTimeLocal(newTrip.timeEnd)}
+                  min={formatDateTimeLocal(newTrip.timeStart)}
+                  onChange={(e) => setNewTrip({ ...newTrip, timeEnd: localDateTimeToISO(e.target.value) })}
+                  className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                />
+                {(new Date(newTrip.timeEnd).getTime() <= new Date(newTrip.timeStart).getTime() || new Date(newTrip.timeEnd).getTime() < Date.now()) && (
+                  <div className="text-xs text-red-500 mt-1">Thời gian đến phải sau khởi hành và không ở quá khứ.</div>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Giá vé (đ)</label>
@@ -784,12 +1037,34 @@ export default function RoutesManagement() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Bus ID</label>
-                  <input type="number" min={1} value={newTrip.busId} onChange={(e) => setNewTrip({ ...newTrip, busId: parseInt(e.target.value) || 0 })} className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Chọn xe bus</label>
+                  <select
+                    value={newTrip.busId}
+                    onChange={(e) => setNewTrip({ ...newTrip, busId: parseInt(e.target.value) || 0 })}
+                    className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                  >
+                    <option value={0}>-- Chọn xe --</option>
+                    {buses.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name} - {b.numberPlate} ({b.companyName})
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Driver ID</label>
-                  <input type="number" min={1} value={newTrip.driverId} onChange={(e) => setNewTrip({ ...newTrip, driverId: parseInt(e.target.value) || 0 })} className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Chọn tài xế</label>
+                  <select
+                    value={newTrip.driverId}
+                    onChange={(e) => setNewTrip({ ...newTrip, driverId: parseInt(e.target.value) || 0 })}
+                    className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                  >
+                    <option value={0}>-- Chọn tài xế --</option>
+                    {drivers.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.fullName || d.email} ({d.email})
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
               <div>
@@ -797,9 +1072,104 @@ export default function RoutesManagement() {
                 <textarea value={newTrip.description} onChange={(e) => setNewTrip({ ...newTrip, description: e.target.value })} rows={3} className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
               </div>
             </div>
+            {(() => {
+              const nowMs = Date.now();
+              const startMs = newTrip ? new Date(newTrip.timeStart).getTime() : 0;
+              const endMs = newTrip ? new Date(newTrip.timeEnd).getTime() : 0;
+              const invalid = !newTrip || startMs < nowMs || endMs < nowMs || endMs <= startMs || (newTrip.busId ?? 0) <= 0 || (newTrip.driverId ?? 0) <= 0;
+              return (
+                <div className="p-5 border-t border-gray-200 dark:border-gray-700 flex justify-end space-x-3">
+                  <button onClick={() => { setCreatingTripForRoute(null); setNewTrip(null); }} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600">Hủy</button>
+                  <button onClick={submitCreateTrip} disabled={invalid} className={`px-4 py-2 text-sm font-medium text-white rounded-lg ${invalid ? 'bg-pink-600/50 cursor-not-allowed' : 'bg-pink-600 hover:bg-pink-700'}`}>Tạo chuyến</button>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* Trip Station Creation Modal */}
+      {isTripStationModalOpen && creatingStationForTrip && newTripStation && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/50" onClick={closeModals} />
+          <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-xl max-w-lg w-full">
+            <div className="flex items-center justify-between p-5 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Tạo trạm cho chuyến {creatingStationForTrip.tripId}</h3>
+              <button onClick={closeModals} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Mã trạm</label>
+                <input
+                  type="text"
+                  value={newTripStation.tripStationId}
+                  onChange={(e) => setNewTripStation({ ...newTripStation, tripStationId: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                  placeholder="Nhập mã trạm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Chọn trạm</label>
+                <select
+                  value={newTripStation.stationId}
+                  onChange={(e) => setNewTripStation({ ...newTripStation, stationId: parseInt(e.target.value) || 0 })}
+                  className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                >
+                  <option value={0}>-- Chọn trạm --</option>
+                  {tripStations.map((station) => (
+                    <option key={station.id} value={station.id}>
+                      {station.stationName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Giá vé (đ)</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={newTripStation.price}
+                  onChange={(e) => setNewTripStation({ ...newTripStation, price: parseInt(e.target.value) || 0 })}
+                  className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Thời gian đón</label>
+                <input
+                  type="datetime-local"
+                  value={formatDateTimeLocal(newTripStation.pickUpTime)}
+                  onChange={(e) => setNewTripStation({ ...newTripStation, pickUpTime: localDateTimeToISO(e.target.value) })}
+                  className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Mô tả</label>
+                <textarea
+                  value={newTripStation.description}
+                  onChange={(e) => setNewTripStation({ ...newTripStation, description: e.target.value })}
+                  rows={3}
+                  className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                  placeholder="Mô tả trạm"
+                />
+              </div>
+            </div>
             <div className="p-5 border-t border-gray-200 dark:border-gray-700 flex justify-end space-x-3">
-              <button onClick={() => { setCreatingTripForRoute(null); setNewTrip(null); }} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600">Hủy</button>
-              <button onClick={submitCreateTrip} className="px-4 py-2 text-sm font-medium text-white bg-pink-600 hover:bg-pink-700 rounded-lg">Tạo chuyến</button>
+              <button onClick={closeModals} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600">
+                Hủy
+              </button>
+              <button
+                onClick={handleCreateTripStation}
+                disabled={!newTripStation.tripStationId || !newTripStation.stationId || newTripStation.price <= 0}
+                className={`px-4 py-2 text-sm font-medium text-white rounded-lg ${
+                  !newTripStation.tripStationId || !newTripStation.stationId || newTripStation.price <= 0
+                    ? 'bg-blue-600/50 cursor-not-allowed'
+                    : 'bg-blue-600 hover:bg-blue-700'
+                }`}
+              >
+                Tạo trạm
+              </button>
             </div>
           </div>
         </div>
