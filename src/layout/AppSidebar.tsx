@@ -16,7 +16,6 @@ import {
   GroupIcon,
 } from "../icons";
 import { useSidebar } from "../context/SidebarContext";
-import { useAuth } from "../context/AuthContext";
 import SidebarWidget from "./SidebarWidget";
 
 type NavItem = {
