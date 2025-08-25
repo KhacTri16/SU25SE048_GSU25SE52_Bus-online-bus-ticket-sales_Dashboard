@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Company, CreateCompanyRequest } from '../../types/company';
-import { companyService } from '../../services/api';
+import { Company, CreateCompanyRequest, ChargeRate } from '../../types/company';
+import { companyService, chargeRateService } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { Modal } from '../ui/modal';
 
@@ -32,8 +32,13 @@ export default function CompanyList() {
     description: '',
     maxPercent: 0,
     minPercent: 0,
+    chargeRateId: 0,
     logo: null,
   });
+
+  // Charge rate states
+  const [chargeRates, setChargeRates] = useState<ChargeRate[]>([]);
+  const [loadingChargeRates, setLoadingChargeRates] = useState<boolean>(false);
 
   useEffect(() => {
     const fetchCompanies = async () => {
@@ -95,6 +100,26 @@ export default function CompanyList() {
 
     fetchCompanies();
   }, [isCompanyRestricted, getUserCompanyId]);
+
+  // Fetch charge rates when create modal opens
+  useEffect(() => {
+    const fetchChargeRates = async () => {
+      if (isCreateOpen && isAdmin()) {
+        try {
+          setLoadingChargeRates(true);
+          const response = await chargeRateService.getAllChargeRates(1, 100);
+          setChargeRates(response.data || []);
+        } catch (error) {
+          console.error('Error fetching charge rates:', error);
+          setChargeRates([]);
+        } finally {
+          setLoadingChargeRates(false);
+        }
+      }
+    };
+
+    fetchChargeRates();
+  }, [isCreateOpen, isAdmin]);
 
   const getStatusBadge = (status: number) => {
     return status === 1 ? (
@@ -392,105 +417,335 @@ export default function CompanyList() {
       </div>
 
       {isAdmin() && (
-        <Modal isOpen={isCreateOpen} onClose={() => !creating && setIsCreateOpen(false)} className="max-w-2xl p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Tạo công ty mới</h3>
-          <form
-            onSubmit={async (e) => {
-              e.preventDefault();
-              try {
-                setCreating(true);
-                await companyService.createCompany(form);
-                // refresh list
-                setIsCreateOpen(false);
-                setForm({ companyId: '', name: '', phone: '', address: '', website: '', status: 0, taxNumber: '', description: '', maxPercent: 0, minPercent: 0, logo: null });
-                // reload companies by calling existing effect logic
-                setLoading(true);
-                const response = await companyService.getAllCompanies(1, 50);
-                let companiesData = response.data || [];
-                if (isCompanyRestricted()) {
-                  const userCompanyId = getUserCompanyId();
-                  if (userCompanyId) {
-                    companiesData = companiesData.filter(company => company.id === userCompanyId);
-                    if (companiesData.length === 0) {
-                      try {
-                        const specificCompanyResponse = await companyService.getCompanyById(userCompanyId);
-                        if (specificCompanyResponse) {
-                          companiesData = [specificCompanyResponse];
+        <Modal isOpen={isCreateOpen} onClose={() => !creating && setIsCreateOpen(false)} className="max-w-2xl max-h-[90vh] p-0 overflow-hidden">
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl">
+            {/* Header */}
+            <div className="px-6 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-t-lg">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold">Tạo công ty mới</h3>
+                    <p className="text-blue-100 text-sm">Thêm công ty vận tải vào hệ thống</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => !creating && setIsCreateOpen(false)}
+                  className="w-7 h-7 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Scrollable Form Content */}
+            <div className="max-h-[calc(90vh-120px)] overflow-y-auto">
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  try {
+                    setCreating(true);
+                    await companyService.createCompany(form);
+                    // refresh list
+                    setIsCreateOpen(false);
+                    setForm({ companyId: '', name: '', phone: '', address: '', website: '', status: 0, taxNumber: '', description: '', maxPercent: 0, minPercent: 0, chargeRateId: 0, logo: null });
+                    // reload companies by calling existing effect logic
+                    setLoading(true);
+                    const response = await companyService.getAllCompanies(1, 50);
+                    let companiesData = response.data || [];
+                    if (isCompanyRestricted()) {
+                      const userCompanyId = getUserCompanyId();
+                      if (userCompanyId) {
+                        companiesData = companiesData.filter(company => company.id === userCompanyId);
+                        if (companiesData.length === 0) {
+                          try {
+                            const specificCompanyResponse = await companyService.getCompanyById(userCompanyId);
+                            if (specificCompanyResponse) {
+                              companiesData = [specificCompanyResponse];
+                            }
+                          } catch {}
                         }
-                      } catch {}
+                      }
                     }
+                    setCompanies(companiesData);
+                    setApiInfo({ totalCount: response.totalCount, totalPage: response.totalPage });
+                  } catch (err) {
+                    console.error('Create company failed:', err);
+                    alert('Tạo công ty thất bại. Vui lòng kiểm tra dữ liệu và thử lại.');
+                  } finally {
+                    setCreating(false);
+                    setLoading(false);
                   }
-                }
-                setCompanies(companiesData);
-                setApiInfo({ totalCount: response.totalCount, totalPage: response.totalPage });
-              } catch (err) {
-                console.error('Create company failed:', err);
-                alert('Tạo công ty thất bại. Vui lòng kiểm tra dữ liệu và thử lại.');
-              } finally {
-                setCreating(false);
-                setLoading(false);
-              }
-            }}
-            className="space-y-4"
-          >
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">CompanyId</label>
-                <input value={form.companyId} onChange={(e) => setForm({ ...form, companyId: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 py-2 dark:border-gray-800 dark:bg-gray-900 dark:text-white" placeholder="VD: ABC123" />
-              </div>
-              <div>
-                <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Name</label>
-                <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 py-2 dark:border-gray-800 dark:bg-gray-900 dark:text-white" placeholder="Tên công ty" />
-              </div>
-              <div>
-                <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Phone</label>
-                <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 py-2 dark:border-gray-800 dark:bg-gray-900 dark:text-white" placeholder="Số điện thoại" />
-              </div>
-              <div>
-                <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Address</label>
-                <input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 py-2 dark:border-gray-800 dark:bg-gray-900 dark:text-white" placeholder="Địa chỉ" />
-              </div>
-              <div>
-                <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Website</label>
-                <input value={form.website} onChange={(e) => setForm({ ...form, website: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 py-2 dark:border-gray-800 dark:bg-gray-900 dark:text-white" placeholder="https://..." />
-              </div>
-              <div>
-                <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Status</label>
-                <select value={form.status ?? 0} onChange={(e) => setForm({ ...form, status: parseInt(e.target.value) })} className="w-full border border-gray-200 rounded-lg px-3 py-2 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
-                  <option value={0}>0 - Không hoạt động</option>
-                  <option value={1}>1 - Hoạt động</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">TaxNumber</label>
-                <input value={form.taxNumber} onChange={(e) => setForm({ ...form, taxNumber: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 py-2 dark:border-gray-800 dark:bg-gray-900 dark:text-white" placeholder="Mã số thuế" />
-              </div>
-              <div>
-                <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">MaxPercent</label>
-                <input type="number" value={form.maxPercent ?? 0} onChange={(e) => setForm({ ...form, maxPercent: parseInt(e.target.value || '0') })} className="w-full border border-gray-200 rounded-lg px-3 py-2 dark:border-gray-800 dark:bg-gray-900 dark:text-white" />
-              </div>
-              <div>
-                <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">MinPercent</label>
-                <input type="number" value={form.minPercent ?? 0} onChange={(e) => setForm({ ...form, minPercent: parseInt(e.target.value || '0') })} className="w-full border border-gray-200 rounded-lg px-3 py-2 dark:border-gray-800 dark:bg-gray-900 dark:text-white" />
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Description</label>
-                <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 py-2 dark:border-gray-800 dark:bg-gray-900 dark:text-white" rows={3} />
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Logo</label>
-                <input type="file" accept="image/*" onChange={(e) => setForm({ ...form, logo: e.target.files && e.target.files[0] ? e.target.files[0] : null })} className="w-full" />
-              </div>
+                }}
+                className="p-6 space-y-4"
+              >
+                {/* Basic Information Section */}
+                <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="w-6 h-6 bg-blue-100 dark:bg-blue-900/30 rounded flex items-center justify-center">
+                      <svg className="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <h4 className="text-base font-semibold text-gray-900 dark:text-white">Thông tin cơ bản</h4>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Mã công ty <span className="text-red-500">*</span>
+                      </label>
+                      <input 
+                        value={form.companyId} 
+                        onChange={(e) => setForm({ ...form, companyId: e.target.value })} 
+                        className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors text-sm" 
+                        placeholder="VD: ABC123" 
+                        required
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Tên công ty <span className="text-red-500">*</span>
+                      </label>
+                      <input 
+                        value={form.name} 
+                        onChange={(e) => setForm({ ...form, name: e.target.value })} 
+                        className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors text-sm" 
+                        placeholder="Tên công ty vận tải" 
+                        required
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Số điện thoại
+                      </label>
+                      <input 
+                        value={form.phone} 
+                        onChange={(e) => setForm({ ...form, phone: e.target.value })} 
+                        className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors text-sm" 
+                        placeholder="0123456789" 
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Website
+                      </label>
+                      <input 
+                        value={form.website} 
+                        onChange={(e) => setForm({ ...form, website: e.target.value })} 
+                        className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors text-sm" 
+                        placeholder="https://example.com" 
+                      />
+                    </div>
+                    
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Địa chỉ
+                      </label>
+                      <input 
+                        value={form.address} 
+                        onChange={(e) => setForm({ ...form, address: e.target.value })} 
+                        className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors text-sm" 
+                        placeholder="Địa chỉ trụ sở chính" 
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Business Information Section */}
+                <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="w-6 h-6 bg-green-100 dark:bg-green-900/30 rounded flex items-center justify-center">
+                      <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                    <h4 className="text-base font-semibold text-gray-900 dark:text-white">Thông tin kinh doanh</h4>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Mã số thuế
+                      </label>
+                      <input 
+                        value={form.taxNumber} 
+                        onChange={(e) => setForm({ ...form, taxNumber: e.target.value })} 
+                        className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors text-sm" 
+                        placeholder="Mã số thuế công ty" 
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Trạng thái
+                      </label>
+                      <select 
+                        value={form.status ?? 0} 
+                        onChange={(e) => setForm({ ...form, status: parseInt(e.target.value) })} 
+                        className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors text-sm"
+                      >
+                        <option value={0}>Không hoạt động</option>
+                        <option value={1}>Hoạt động</option>
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Tỷ lệ tối thiểu (%)
+                      </label>
+                      <input 
+                        type="number" 
+                        value={form.minPercent ?? 0} 
+                        onChange={(e) => setForm({ ...form, minPercent: parseInt(e.target.value || '0') })} 
+                        className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors text-sm" 
+                        min="0"
+                        max="100"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Tỷ lệ tối đa (%)
+                      </label>
+                      <input 
+                        type="number" 
+                        value={form.maxPercent ?? 0} 
+                        onChange={(e) => setForm({ ...form, maxPercent: parseInt(e.target.value || '0') })} 
+                        className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors text-sm" 
+                        min="0"
+                        max="100"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Tỷ lệ phí hệ thống
+                      </label>
+                      <select 
+                        value={form.chargeRateId ?? 0} 
+                        onChange={(e) => setForm({ ...form, chargeRateId: parseInt(e.target.value || '0') })} 
+                        className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors text-sm"
+                        disabled={loadingChargeRates}
+                      >
+                        <option value={0}>Chọn tỷ lệ phí</option>
+                        {chargeRates.map((rate) => (
+                          <option key={rate.id} value={rate.id}>
+                            {rate.name} - {rate.rate}% (Hết hạn: {new Date(rate.endDate).toLocaleDateString('vi-VN')})
+                          </option>
+                        ))}
+                      </select>
+                      {loadingChargeRates && (
+                        <div className="flex items-center mt-1 text-xs text-gray-500">
+                          <div className="w-3 h-3 border border-gray-300 border-t-blue-600 rounded-full animate-spin mr-1"></div>
+                          Đang tải tỷ lệ phí...
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Additional Information Section */}
+                <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="w-6 h-6 bg-purple-100 dark:bg-purple-900/30 rounded flex items-center justify-center">
+                      <svg className="w-4 h-4 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                    <h4 className="text-base font-semibold text-gray-900 dark:text-white">Thông tin bổ sung</h4>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Mô tả
+                      </label>
+                      <textarea 
+                        value={form.description} 
+                        onChange={(e) => setForm({ ...form, description: e.target.value })} 
+                        className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors text-sm" 
+                        rows={3}
+                        placeholder="Mô tả về công ty, dịch vụ, đặc điểm..."
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Logo công ty
+                      </label>
+                      <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4 text-center hover:border-blue-400 dark:hover:border-blue-400 transition-colors">
+                        <input 
+                          type="file" 
+                          accept="image/*" 
+                          onChange={(e) => setForm({ ...form, logo: e.target.files && e.target.files[0] ? e.target.files[0] : null })} 
+                          className="hidden" 
+                          id="logo-upload"
+                        />
+                        <label htmlFor="logo-upload" className="cursor-pointer">
+                          <div className="flex flex-col items-center gap-2">
+                            <div className="w-10 h-10 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center">
+                              <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                              </svg>
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                {form.logo ? form.logo.name : 'Tải lên logo công ty'}
+                              </p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">
+                                PNG, JPG, GIF tối đa 10MB
+                              </p>
+                            </div>
+                          </div>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Form Actions */}
+                <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <button 
+                    type="button" 
+                    disabled={creating} 
+                    onClick={() => setIsCreateOpen(false)} 
+                    className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-medium text-sm"
+                  >
+                    Hủy
+                  </button>
+                  <button 
+                    type="submit" 
+                    disabled={creating} 
+                    className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all font-medium flex items-center gap-2 disabled:opacity-50 text-sm"
+                  >
+                    {creating ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                        Đang tạo...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                        </svg>
+                        Tạo công ty
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
             </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <button type="button" disabled={creating} onClick={() => setIsCreateOpen(false)} className="px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-800">
-                Hủy
-              </button>
-              <button type="submit" disabled={creating} className="px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700">
-                {creating ? 'Đang tạo...' : 'Tạo công ty'}
-              </button>
-            </div>
-          </form>
+          </div>
         </Modal>
       )}
 

@@ -1,60 +1,48 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { ticketService } from "../../services/api";
 
-const recentBookings = [
-  {
-    id: "TK001",
-    customerName: "Nguyễn Văn A",
-    route: "Hà Nội - TP.HCM",
-    departureTime: "06:00",
-    date: "30/07/2025",
-    seatNumber: "A12",
-    price: "650,000",
-    status: "confirmed"
-  },
-  {
-    id: "TK002", 
-    customerName: "Trần Thị B",
-    route: "Hà Nội - Đà Nẵng",
-    departureTime: "07:30",
-    date: "30/07/2025",
-    seatNumber: "B08",
-    price: "450,000",
-    status: "confirmed"
-  },
-  {
-    id: "TK003",
-    customerName: "Lê Văn C",
-    route: "TP.HCM - Đà Lạt",
-    departureTime: "08:00",
-    date: "31/07/2025",
-    seatNumber: "C15",
-    price: "320,000",
-    status: "pending"
-  },
-  {
-    id: "TK004",
-    customerName: "Phạm Thị D",
-    route: "Hà Nội - Hải Phòng",
-    departureTime: "09:15",
-    date: "30/07/2025",
-    seatNumber: "D05",
-    price: "180,000",
-    status: "confirmed"
-  },
-  {
-    id: "TK005",
-    customerName: "Hoàng Văn E",
-    route: "TP.HCM - Vũng Tàu",
-    departureTime: "10:30",
-    date: "30/07/2025",
-    seatNumber: "E22",
-    price: "150,000",
-    status: "cancelled"
-  }
-];
+type BookingRow = {
+  id: string;
+  customerName: string;
+  route: string;
+  departureTime: string;
+  date: string;
+  seatNumber: string;
+  price: string;
+  status: "confirmed" | "pending" | "cancelled";
+};
 
 export default function RecentBookings() {
-  const [bookings] = useState(recentBookings);
+  const [bookings, setBookings] = useState<BookingRow[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+
+  useEffect(() => {
+    const fetchRecent = async () => {
+      setLoading(true);
+      try {
+        const tickets = await ticketService.getAllTickets();
+        // Sort by createDate desc and take latest 5
+        tickets.sort((a, b) => new Date(b.createDate).getTime() - new Date(a.createDate).getTime());
+        const latest = tickets.slice(0, 5).map(t => ({
+          id: t.ticketId,
+          customerName: t.customerName,
+          route: `${t.fromTripStation} - ${t.toTripStation}`,
+          departureTime: new Date(t.timeStart).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+          date: new Date(t.timeStart).toLocaleDateString('vi-VN'),
+          seatNumber: t.seatId,
+          price: new Intl.NumberFormat('vi-VN').format(t.price),
+          status: t.status === 0 || t.status === 5 ? "confirmed" : t.status === 2 ? "cancelled" : "pending",
+        }));
+        setBookings(latest);
+      } catch (e) {
+        console.error('Error fetching recent bookings:', e);
+        setBookings([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchRecent();
+  }, []);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -81,7 +69,11 @@ export default function RecentBookings() {
       </div>
 
       <div className="space-y-4">
-        {bookings.map((booking) => (
+        {loading ? (
+          <div className="p-4 text-sm text-gray-500 dark:text-gray-400">Đang tải...</div>
+        ) : bookings.length === 0 ? (
+          <div className="p-4 text-sm text-gray-500 dark:text-gray-400">Chưa có đặt vé nào gần đây</div>
+        ) : bookings.map((booking) => (
           <div key={booking.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg dark:bg-gray-900/50">
             <div className="flex items-center space-x-4">
               <div className="flex-shrink-0">

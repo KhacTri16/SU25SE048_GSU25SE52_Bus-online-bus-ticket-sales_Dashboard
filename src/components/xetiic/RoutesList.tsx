@@ -1,55 +1,19 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { tripService } from "../../services/api";
 
-const routesData = [
-  {
-    id: 1,
-    route: "Hà Nội - TP.HCM",
-    time: "06:00 - 22:30",
-    price: "650,000",
-    available: 12,
-    total: 45,
-    status: "available"
-  },
-  {
-    id: 2,
-    route: "Hà Nội - Đà Nẵng",
-    time: "07:30 - 18:45",
-    price: "450,000",
-    available: 8,
-    total: 40,
-    status: "available"
-  },
-  {
-    id: 3,
-    route: "TP.HCM - Đà Lạt",
-    time: "08:00 - 14:30",
-    price: "320,000",
-    available: 0,
-    total: 35,
-    status: "full"
-  },
-  {
-    id: 4,
-    route: "Hà Nội - Hải Phòng",
-    time: "09:15 - 11:45",
-    price: "180,000",
-    available: 25,
-    total: 40,
-    status: "available"
-  },
-  {
-    id: 5,
-    route: "TP.HCM - Vũng Tàu",
-    time: "10:30 - 13:00",
-    price: "150,000",
-    available: 18,
-    total: 30,
-    status: "available"
-  }
-];
+type RouteRow = {
+  id: number;
+  route: string;
+  time: string;
+  price: string;
+  available?: number | null;
+  total?: number | null;
+  status: "available" | "full" | "inactive";
+};
 
 export default function RoutesList() {
-  const [routes] = useState(routesData);
+  const [routes, setRoutes] = useState<RouteRow[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
 
   const getStatusBadge = (status: string, available: number) => {
     if (status === "full") {
@@ -61,18 +25,46 @@ export default function RoutesList() {
     }
   };
 
+  useEffect(() => {
+    const fetchActiveTrips = async () => {
+      setLoading(true);
+      try {
+        const resp = await tripService.getAllTrips(0, 100, true);
+        // Take top 10 trips as returned by API (no extra filtering here)
+        const trips = (resp.data || []).slice(0, 10);
+
+        const rows: RouteRow[] = trips.map(t => ({
+          id: t.id,
+          route: `${t.fromLocation} - ${t.endLocation}`,
+          time: `${new Date(t.timeStart).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} - ${new Date(t.timeEnd).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}`,
+          price: new Intl.NumberFormat('vi-VN').format(t.price),
+          available: null,
+          total: null,
+          status: t.status === 1 && !t.isDeleted ? "available" : "inactive",
+        }));
+        setRoutes(rows);
+      } catch (e) {
+        console.error('Error fetching active trips:', e);
+        setRoutes([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchActiveTrips();
+  }, []);
+
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-          Tuyến đường phổ biến hôm nay
+          Tuyến đường phổ biến 
         </h3>
         <button className="text-sm font-medium text-pink-600 hover:text-pink-700 dark:text-pink-400">
           Xem tất cả
         </button>
       </div>
 
-      <div className="overflow-hidden">
+      <div className="overflow-x-auto max-h-[28rem] overflow-y-auto">
         <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
           <thead className="bg-gray-50 dark:bg-gray-900/50">
             <tr>
@@ -94,32 +86,39 @@ export default function RoutesList() {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200 dark:bg-transparent dark:divide-gray-800">
-            {routes.map((route) => (
-              <tr key={route.id} className="hover:bg-gray-50 dark:hover:bg-white/[0.02]">
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="font-medium text-gray-900 dark:text-white">
-                    {route.route}
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                  {route.time}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className="text-sm font-medium text-gray-900 dark:text-white">
-                    {route.price} VNĐ
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm">
-                  <span className={`${route.available <= 5 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'}`}>
-                    {route.available}
-                  </span>
-                  <span className="text-gray-500 dark:text-gray-400">/{route.total}</span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  {getStatusBadge(route.status, route.available)}
-                </td>
+            {loading ? (
+              <tr>
+                <td colSpan={5} className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">Đang tải...</td>
               </tr>
-            ))}
+            ) : routes.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">Không có chuyến đi đang hoạt động</td>
+              </tr>
+            ) : (
+              routes.map((route) => (
+                <tr key={route.id} className="hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="font-medium text-gray-900 dark:text-white">
+                      {route.route}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                    {route.time}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">
+                      {route.price} VNĐ
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <span className="text-gray-500 dark:text-gray-400">-</span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {getStatusBadge(route.status, route.available ?? 10)}
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>

@@ -3,7 +3,7 @@ import ReactApexChart from "react-apexcharts";
 import PageMeta from "../../components/common/PageMeta";
 import { useAuth } from "../../context/AuthContext";
 import { paymentService, CompanyRevenueData, companyService, ticketService } from "../../services/api";
-import { CompanySettlement } from "../../types/company";
+import { CompanySettlement, AdminRevenueSummary } from "../../types/company";
 
 export default function RevenueReport() {
   const authContext = useAuth();
@@ -17,28 +17,35 @@ export default function RevenueReport() {
   // Admin-specific states
   const [allCompaniesData, setAllCompaniesData] = useState<CompanyRevenueData[]>([]);
   const [systemTotalRevenue, setSystemTotalRevenue] = useState<number | null>(null);
+  const [systemTotalRefunded, setSystemTotalRefunded] = useState<number | null>(null);
+  const [systemFee, setSystemFee] = useState<number | null>(null);
+  const [systemNetRevenue, setSystemNetRevenue] = useState<number | null>(null);
+  const [currentMonthDetail, setCurrentMonthDetail] = useState<AdminRevenueSummary | null>(null);
   const [loadingDetailedData, setLoadingDetailedData] = useState<boolean>(false);
   const [settlements, setSettlements] = useState<CompanySettlement[] | null>(null);
   const [loadingSettlements, setLoadingSettlements] = useState<boolean>(false);
+  
+  // Company-specific states for non-admin users
+  const [companyRevenueSummary, setCompanyRevenueSummary] = useState<AdminRevenueSummary | null>(null);
 
-  const options = useMemo(() => ({
-    chart: { type: "bar" as const, toolbar: { show: false } },
-    colors: ["#6366f1"],
-    plotOptions: { bar: { horizontal: false, columnWidth: "45%" } },
-    dataLabels: { enabled: false },
-    stroke: { show: true, width: 2, colors: ["transparent"] },
-    xaxis: {
-      categories: ["T1","T2","T3","T4","T5","T6","T7","T8","T9","T10","T11","T12"],
-    },
-    yaxis: {
-      title: { text: "Doanh thu (VND)" },
-      labels: { formatter: (v: number) => new Intl.NumberFormat('vi-VN').format(v) },
-    },
-    fill: { opacity: 0.8 },
-    tooltip: {
-      y: { formatter: (val: number) => new Intl.NumberFormat('vi-VN').format(val) + " VND" },
-    },
-  }), []);
+     const options = useMemo(() => ({
+     chart: { type: "bar" as const, toolbar: { show: false } },
+     colors: ["#6366f1"],
+     plotOptions: { bar: { horizontal: false, columnWidth: "45%" } },
+     dataLabels: { enabled: false },
+     stroke: { show: true, width: 2, colors: ["transparent"] },
+     xaxis: {
+       categories: ["T1","T2","T3","T4","T5","T6","T7","T8","T9","T10","T11","T12"],
+     },
+     yaxis: {
+       title: { text: isAdmin() ? "Tổng doanh thu hệ thống (VND)" : "Doanh thu (VND)" },
+       labels: { formatter: (v: number) => new Intl.NumberFormat('vi-VN').format(v) },
+     },
+     fill: { opacity: 0.8 },
+     tooltip: {
+       y: { formatter: (val: number) => new Intl.NumberFormat('vi-VN').format(val) + " VND" },
+     },
+   }), [isAdmin]);
 
   useEffect(() => {
     const fetchRevenue = async () => {
@@ -49,12 +56,44 @@ export default function RevenueReport() {
           try {
             const simpleRevenueData = await paymentService.getAllCompaniesRevenue();
             setSystemTotalRevenue(simpleRevenueData.totalRevenue);
-            console.log('Total system revenue:', simpleRevenueData.totalRevenue);
+            setSystemTotalRefunded(simpleRevenueData.totalRefunded);
+            setSystemFee(simpleRevenueData.systemFee);
+            setSystemNetRevenue(simpleRevenueData.netRevenue);
+            console.log('Admin revenue summary:', {
+              totalRevenue: simpleRevenueData.totalRevenue,
+              totalRefunded: simpleRevenueData.totalRefunded,
+              systemFee: simpleRevenueData.systemFee,
+              netRevenue: simpleRevenueData.netRevenue
+            });
           } catch (error) {
             console.error('Error fetching simple revenue:', error);
           }
           
-          // Then try to get detailed breakdown
+          // Fetch monthly revenue for the entire system
+          try {
+            console.log('Fetching system monthly revenue...');
+            const systemMonthlyData = await paymentService.getSystemMonthlyRevenue(year);
+            setMonthlyRevenue(systemMonthlyData);
+            console.log('System monthly revenue:', systemMonthlyData);
+          } catch (error) {
+            console.error('Error fetching system monthly revenue:', error);
+            setMonthlyRevenue(Array(12).fill(0));
+          }
+          
+          // Fetch detailed revenue for current month
+          try {
+            const currentMonth = new Date().getMonth() + 1; // getMonth() returns 0-11
+            const currentYear = new Date().getFullYear();
+            console.log('Fetching current month detailed revenue...');
+            const currentMonthData = await paymentService.getSystemMonthlyRevenueDetail(currentYear, currentMonth);
+            setCurrentMonthDetail(currentMonthData);
+            console.log('Current month detailed revenue:', currentMonthData);
+          } catch (error) {
+            console.error('Error fetching current month detailed revenue:', error);
+            setCurrentMonthDetail(null);
+          }
+          
+          // Then try to get detailed breakdown for companies table
           try {
             setLoadingDetailedData(true);
             console.log('Fetching detailed companies breakdown...');
@@ -72,96 +111,104 @@ export default function RevenueReport() {
             if (allRevenueData.totalRevenue > 0) {
               setSystemTotalRevenue(allRevenueData.totalRevenue);
             }
-            
-            // For chart display, show aggregated monthly data from all companies
-            const aggregatedMonthly = Array(12).fill(0);
-            allRevenueData.companiesRevenue.forEach(company => {
-              company.monthlyRevenue.forEach((revenue, idx) => {
-                if (idx < 12) {
-                  aggregatedMonthly[idx] += revenue;
-                }
-              });
-            });
-            setMonthlyRevenue(aggregatedMonthly);
           } catch (error) {
             console.error('Error fetching detailed revenue breakdown:', error);
             // If detailed breakdown fails, at least show the total
             setAllCompaniesData([]);
-            setMonthlyRevenue(Array(12).fill(0));
           } finally {
             setLoadingDetailedData(false);
           }
-        } else {
-          // Manager/Staff/Driver/Seller: Fetch only their company data
-          const companyId = getUserCompanyId();
-          console.log('Current user context:', {
-            userId: authContext.user?.id,
-            roleId: authContext.user?.roleId,
-            companyId: authContext.user?.companyId,
-            extractedCompanyId: companyId
-          });
-          
-          if (!companyId) {
-            console.warn('No company ID found for user');
-            setTotalRevenue(0);
-            setMonthlyRevenue(Array(12).fill(0));
-            return;
-          }
-          
-          console.log(`Fetching revenue for company ${companyId} (user role: ${authContext.user?.roleId})`);
-          
-          try {
-            // Fetch company name for display
-            try {
-              const company = await companyService.getCompanyById(companyId);
-              setCompanyName(company.name);
-            } catch (nameErr) {
-              console.warn('Could not fetch company name:', nameErr);
-              setCompanyName("");
-            }
+                 } else {
+           // Manager/Staff/Driver/Seller: Fetch only their company data
+           const companyId = getUserCompanyId();
+           console.log('Current user context:', {
+             userId: authContext.user?.id,
+             roleId: authContext.user?.roleId,
+             companyId: authContext.user?.companyId,
+             extractedCompanyId: companyId
+           });
+           
+           if (!companyId) {
+             console.warn('No company ID found for user');
+             setTotalRevenue(0);
+             setMonthlyRevenue(Array(12).fill(0));
+             return;
+           }
+           
+           console.log(`Fetching revenue for company ${companyId} (user role: ${authContext.user?.roleId})`);
+           
+           try {
+             // Fetch company name for display
+             try {
+               const company = await companyService.getCompanyById(companyId);
+               setCompanyName(company.name);
+             } catch (nameErr) {
+               console.warn('Could not fetch company name:', nameErr);
+               setCompanyName("");
+             }
 
-            // Compute total and monthly revenue from tickets (remove monthly API calls)
-            const tickets = await ticketService.getAllTickets();
-            let filtered = tickets;
-            try {
-              const company = await companyService.getCompanyById(companyId);
-              filtered = tickets.filter(t => t.companyName === company.name);
-            } catch {}
+             // Fetch detailed company revenue summary using new API
+             try {
+               console.log('Fetching company revenue summary...');
+               const companyRevenueData = await paymentService.getCompanyRevenueSummary(companyId);
+               setCompanyRevenueSummary(companyRevenueData);
+               setTotalRevenue(companyRevenueData.totalRevenue);
+               console.log('Company revenue summary:', companyRevenueData);
+             } catch (error) {
+               console.error('Error fetching company revenue summary:', error);
+               setCompanyRevenueSummary(null);
+               setTotalRevenue(0);
+             }
 
-            const byYear = filtered.filter(t => new Date(t.timeStart).getFullYear() === year);
-            const monthly = Array(12).fill(0);
-            let computedTotal = 0;
-            byYear.forEach(t => {
-              // Count revenue for paid or completed statuses
-              if (t.status === 0 || t.status === 5) {
-                const m = new Date(t.timeStart).getMonth();
-                monthly[m] += t.price || 0;
-                computedTotal += t.price || 0;
+                           // Fetch monthly revenue using new API
+              try {
+                console.log('Fetching company monthly revenue...');
+                const companyMonthlyData = await paymentService.getCompanyMonthlyRevenue(companyId, year);
+                setMonthlyRevenue(companyMonthlyData);
+                console.log(`Company ${companyId} monthly revenue (from API):`, companyMonthlyData);
+              } catch (error) {
+                console.error('Error fetching company monthly revenue:', error);
+                // Fallback to ticket computation if API fails
+                const tickets = await ticketService.getAllTickets();
+                let filtered = tickets;
+                try {
+                  const company = await companyService.getCompanyById(companyId);
+                  filtered = tickets.filter(t => t.companyName === company.name);
+                } catch {}
+
+                const byYear = filtered.filter(t => new Date(t.timeStart).getFullYear() === year);
+                const monthly = Array(12).fill(0);
+                byYear.forEach(t => {
+                  // Count revenue for paid or completed statuses
+                  if (t.status === 0 || t.status === 5) {
+                    const m = new Date(t.timeStart).getMonth();
+                    monthly[m] += t.price || 0;
+                  }
+                });
+                setMonthlyRevenue(monthly);
+                console.log(`Company ${companyId} monthly revenue (fallback computed):`, monthly);
               }
-            });
-            setMonthlyRevenue(monthly);
-            setTotalRevenue(computedTotal);
-            console.log(`Company ${companyId} monthly revenue (computed):`, monthly);
 
-            // Fetch settlements for this company (Manager view)
-            try {
-              setLoadingSettlements(true);
-              const list = await companyService.getCompanySettlements(companyId);
-              // sort by createdAt desc
-              list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-              setSettlements(list);
-            } catch (settleErr) {
-              console.warn('Could not load settlements:', settleErr);
-              setSettlements([]);
-            } finally {
-              setLoadingSettlements(false);
-            }
-          } catch (error) {
-            console.error(`Error fetching revenue for company ${companyId}:`, error);
-            setTotalRevenue(0);
-            setMonthlyRevenue(Array(12).fill(0));
-            setSettlements([]);
-          }
+             // Fetch settlements for this company (Manager view)
+             try {
+               setLoadingSettlements(true);
+               const list = await companyService.getCompanySettlements(companyId);
+               // sort by createdAt desc
+               list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+               setSettlements(list);
+             } catch (settleErr) {
+               console.warn('Could not load settlements:', settleErr);
+               setSettlements([]);
+             } finally {
+               setLoadingSettlements(false);
+             }
+           } catch (error) {
+             console.error(`Error fetching revenue for company ${companyId}:`, error);
+             setTotalRevenue(0);
+             setMonthlyRevenue(Array(12).fill(0));
+             setSettlements([]);
+             setCompanyRevenueSummary(null);
+           }
         }
       } catch (err) {
         console.error('Error fetching revenue data:', err);
@@ -189,11 +236,15 @@ export default function RevenueReport() {
       </div>
 
       <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Doanh thu theo tháng</h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Năm {year}</p>
-          </div>
+                 <div className="flex items-center justify-between mb-6">
+           <div>
+             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+               {isAdmin() ? "Tổng doanh thu hệ thống theo tháng" : "Doanh thu theo tháng"}
+             </h3>
+             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+               {isAdmin() ? `Tổng doanh thu toàn hệ thống năm ${year}` : `Năm ${year}`}
+             </p>
+           </div>
           <div className="flex items-center space-x-2">
             <select
               value={year}
@@ -206,43 +257,110 @@ export default function RevenueReport() {
           </div>
         </div>
 
-        <ReactApexChart
-          options={options}
-          series={[{ name: "Doanh thu", data: monthlyRevenue }]}
-          type="bar"
-          height={380}
-        />
+                 <ReactApexChart
+           options={options}
+           series={[{ name: isAdmin() ? "Tổng doanh thu hệ thống" : "Doanh thu", data: monthlyRevenue }]}
+           type="bar"
+           height={380}
+         />
 
-        <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-gray-200 dark:border-gray-800">
-          <div className="text-center">
-            <p className="text-2xl font-bold text-gray-900 dark:text-white">
-              {isAdmin() 
-                ? (systemTotalRevenue === null ? (isLoading ? '...' : '0') : new Intl.NumberFormat('vi-VN').format(systemTotalRevenue))
-                : (totalRevenue === null ? (isLoading ? '...' : '0') : new Intl.NumberFormat('vi-VN').format(totalRevenue))
-              }
-            </p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              {isAdmin() ? "Tổng doanh thu hệ thống" : "Tổng doanh thu công ty"}
-            </p>
-          </div>
-          <div className="text-center">
-            <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-              {isAdmin() ? allCompaniesData.length : '1'}
-            </p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              {isAdmin() ? "Số công ty" : "Công ty"}
-            </p>
-          </div>
-          <div className="text-center">
-            <p className="text-2xl font-bold text-gray-900 dark:text-white">
-              {new Intl.NumberFormat('vi-VN').format(monthlyRevenue[new Date().getMonth()] || 0)}
-            </p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Doanh thu tháng này</p>
-          </div>
-        </div>
-      </div>
+                 <div className={`grid ${isAdmin() ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-2 md:grid-cols-4'} gap-4 mt-6 pt-6 border-t border-gray-200 dark:border-gray-800`}>
+           <div className="text-center">
+             <p className="text-2xl font-bold text-gray-900 dark:text-white">
+               {isAdmin() 
+                 ? (systemTotalRevenue === null ? (isLoading ? '...' : '0') : new Intl.NumberFormat('vi-VN').format(systemTotalRevenue))
+                 : (companyRevenueSummary?.totalRevenue === null ? (isLoading ? '...' : '0') : new Intl.NumberFormat('vi-VN').format(companyRevenueSummary?.totalRevenue || 0))
+               }
+             </p>
+             <p className="text-sm text-gray-500 dark:text-gray-400">
+               {isAdmin() ? "Tổng doanh thu hệ thống" : "Tổng doanh thu công ty"}
+             </p>
+           </div>
+           {(isAdmin() || companyRevenueSummary) && (
+             <div className="text-center">
+               <p className="text-2xl font-bold text-red-600 dark:text-red-400">
+                 {isAdmin() 
+                   ? (systemTotalRefunded === null ? (isLoading ? '...' : '0') : new Intl.NumberFormat('vi-VN').format(systemTotalRefunded))
+                   : (companyRevenueSummary?.totalRefunded === null ? (isLoading ? '...' : '0') : new Intl.NumberFormat('vi-VN').format(companyRevenueSummary?.totalRefunded || 0))
+                 }
+               </p>
+               <p className="text-sm text-gray-500 dark:text-gray-400">
+                 Tổng hoàn tiền
+               </p>
+             </div>
+           )}
+           {(isAdmin() || companyRevenueSummary) && (
+             <div className="text-center">
+               <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                 {isAdmin() 
+                   ? (systemFee === null ? (isLoading ? '...' : '0') : new Intl.NumberFormat('vi-VN').format(systemFee))
+                   : (companyRevenueSummary?.systemFee === null ? (isLoading ? '...' : '0') : new Intl.NumberFormat('vi-VN').format(companyRevenueSummary?.systemFee || 0))
+                 }
+               </p>
+               <p className="text-sm text-gray-500 dark:text-gray-400">
+                 Phí hệ thống
+               </p>
+             </div>
+           )}
+           {(isAdmin() || companyRevenueSummary) && (
+             <div className="text-center">
+               <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                 {isAdmin() 
+                   ? (systemNetRevenue === null ? (isLoading ? '...' : '0') : new Intl.NumberFormat('vi-VN').format(systemNetRevenue))
+                   : (companyRevenueSummary?.netRevenue === null ? (isLoading ? '...' : '0') : new Intl.NumberFormat('vi-VN').format(companyRevenueSummary?.netRevenue || 0))
+                 }
+               </p>
+               <p className="text-sm text-gray-500 dark:text-gray-400">
+                 Doanh thu ròng
+               </p>
+             </div>
+           )}
+         </div>
+             </div>
 
-      {/* Admin: Total Revenue Summary when no detailed data */}
+       {/* Admin: Current Month Detailed Revenue */}
+       {isAdmin() && currentMonthDetail && (
+         <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
+           <div className="mb-4">
+             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Doanh thu tháng hiện tại</h3>
+             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+               Tháng {new Date().getMonth() + 1}/{new Date().getFullYear()}
+             </p>
+           </div>
+           
+           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+             <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+               <div className="text-2xl font-bold text-green-600 dark:text-green-400 mb-1">
+                 {new Intl.NumberFormat('vi-VN').format(currentMonthDetail.totalRevenue)}
+               </div>
+               <p className="text-sm text-gray-600 dark:text-gray-400">Tổng doanh thu</p>
+             </div>
+             
+             <div className="text-center p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
+               <div className="text-2xl font-bold text-red-600 dark:text-red-400 mb-1">
+                 {new Intl.NumberFormat('vi-VN').format(currentMonthDetail.totalRefunded)}
+               </div>
+               <p className="text-sm text-gray-600 dark:text-gray-400">Tổng hoàn tiền</p>
+             </div>
+             
+             <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+               <div className="text-2xl font-bold text-blue-600 dark:text-blue-400 mb-1">
+                 {new Intl.NumberFormat('vi-VN').format(currentMonthDetail.systemFee)}
+               </div>
+               <p className="text-sm text-gray-600 dark:text-gray-400">Phí hệ thống</p>
+             </div>
+             
+             <div className="text-center p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+               <div className="text-2xl font-bold text-purple-600 dark:text-purple-400 mb-1">
+                 {new Intl.NumberFormat('vi-VN').format(currentMonthDetail.netRevenue)}
+               </div>
+               <p className="text-sm text-gray-600 dark:text-gray-400">Doanh thu ròng</p>
+             </div>
+           </div>
+         </div>
+       )}
+
+       {/* Admin: Total Revenue Summary when no detailed data */}
       {isAdmin() && allCompaniesData.length === 0 && systemTotalRevenue && systemTotalRevenue > 0 && (
         <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
           <div className="mb-4">
@@ -250,13 +368,34 @@ export default function RevenueReport() {
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Tổng doanh thu của tất cả công ty</p>
           </div>
           
-          <div className="text-center py-8">
-            <div className="text-4xl font-bold text-pink-600 dark:text-pink-400 mb-2">
-              {new Intl.NumberFormat('vi-VN').format(systemTotalRevenue)} VND
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+              <div className="text-2xl font-bold text-green-600 dark:text-green-400 mb-1">
+                {new Intl.NumberFormat('vi-VN').format(systemTotalRevenue || 0)}
+              </div>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Tổng doanh thu</p>
             </div>
-            <p className="text-gray-600 dark:text-gray-400">
-              Tổng doanh thu toàn hệ thống
-            </p>
+            
+            <div className="text-center p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
+              <div className="text-2xl font-bold text-red-600 dark:text-red-400 mb-1">
+                {new Intl.NumberFormat('vi-VN').format(systemTotalRefunded || 0)}
+              </div>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Tổng hoàn tiền</p>
+            </div>
+            
+            <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+              <div className="text-2xl font-bold text-blue-600 dark:text-blue-400 mb-1">
+                {new Intl.NumberFormat('vi-VN').format(systemFee || 0)}
+              </div>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Phí hệ thống</p>
+            </div>
+            
+            <div className="text-center p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+              <div className="text-2xl font-bold text-purple-600 dark:text-purple-400 mb-1">
+                {new Intl.NumberFormat('vi-VN').format(systemNetRevenue || 0)}
+              </div>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Doanh thu ròng</p>
+            </div>
           </div>
           
           <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
@@ -345,39 +484,67 @@ export default function RevenueReport() {
 
 
 
-      {/* Manager/Staff: Company Info Card - Show even if totalRevenue is 0 for debugging */}
-      {!isAdmin() && totalRevenue !== null && (
-        <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
-          <div className="mb-4">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Thông tin công ty</h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Chi tiết doanh thu công ty của bạn</p>
-          </div>
-          
-          <div className="bg-gradient-to-r from-pink-50 to-purple-50 dark:from-pink-900/20 dark:to-purple-900/20 rounded-lg p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="flex items-center mb-2">
-                  <div className="h-8 w-8 rounded-full bg-gradient-to-r from-pink-500 to-purple-600 flex items-center justify-center mr-3">
-                    <span className="text-white font-semibold text-sm">C</span>
-                  </div>
-                  <div>
-                    <h4 className="text-lg font-semibold text-gray-900 dark:text-white">Công ty của bạn</h4>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Công ty: {companyName || 'Đang tải...'}</p>
-                  </div>
-                </div>
-              </div>
-              <div className="text-right">
-                <div className={`text-2xl font-bold ${totalRevenue > 0 ? 'text-pink-600 dark:text-pink-400' : 'text-gray-400 dark:text-gray-500'}`}>
-                  {new Intl.NumberFormat('vi-VN').format(totalRevenue)} VND
-                </div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {totalRevenue > 0 ? 'Tổng doanh thu' : 'Chưa có doanh thu'}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+             {/* Manager/Staff: Company Info Card - Show even if totalRevenue is 0 for debugging */}
+       {!isAdmin() && companyRevenueSummary && (
+         <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
+           <div className="mb-4">
+             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Thông tin công ty</h3>
+             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Chi tiết doanh thu công ty của bạn</p>
+           </div>
+           
+           <div className="bg-gradient-to-r from-pink-50 to-purple-50 dark:from-pink-900/20 dark:to-purple-900/20 rounded-lg p-6">
+             <div className="flex items-center justify-between mb-4">
+               <div>
+                 <div className="flex items-center mb-2">
+                   <div className="h-8 w-8 rounded-full bg-gradient-to-r from-pink-500 to-purple-600 flex items-center justify-center mr-3">
+                     <span className="text-white font-semibold text-sm">C</span>
+                   </div>
+                   <div>
+                     <h4 className="text-lg font-semibold text-gray-900 dark:text-white">Công ty của bạn</h4>
+                     <p className="text-sm text-gray-500 dark:text-gray-400">Công ty: {companyName || 'Đang tải...'}</p>
+                   </div>
+                 </div>
+               </div>
+               <div className="text-right">
+                 <div className={`text-2xl font-bold ${companyRevenueSummary.totalRevenue > 0 ? 'text-pink-600 dark:text-pink-400' : 'text-gray-400 dark:text-gray-500'}`}>
+                   {new Intl.NumberFormat('vi-VN').format(companyRevenueSummary.totalRevenue)} VND
+                 </div>
+                 <p className="text-sm text-gray-500 dark:text-gray-400">
+                   {companyRevenueSummary.totalRevenue > 0 ? 'Tổng doanh thu' : 'Chưa có doanh thu'}
+                 </p>
+               </div>
+             </div>
+             
+             {/* Detailed revenue breakdown */}
+             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 pt-4 border-t border-pink-200 dark:border-pink-800">
+               <div className="text-center">
+                 <div className="text-lg font-semibold text-green-600 dark:text-green-400">
+                   {new Intl.NumberFormat('vi-VN').format(companyRevenueSummary.totalRevenue)}
+                 </div>
+                 <p className="text-xs text-gray-600 dark:text-gray-400">Tổng doanh thu</p>
+               </div>
+               <div className="text-center">
+                 <div className="text-lg font-semibold text-red-600 dark:text-red-400">
+                   {new Intl.NumberFormat('vi-VN').format(companyRevenueSummary.totalRefunded)}
+                 </div>
+                 <p className="text-xs text-gray-600 dark:text-gray-400">Tổng hoàn tiền</p>
+               </div>
+               <div className="text-center">
+                 <div className="text-lg font-semibold text-blue-600 dark:text-blue-400">
+                   {new Intl.NumberFormat('vi-VN').format(companyRevenueSummary.systemFee)}
+                 </div>
+                 <p className="text-xs text-gray-600 dark:text-gray-400">Phí hệ thống</p>
+               </div>
+               <div className="text-center">
+                 <div className="text-lg font-semibold text-purple-600 dark:text-purple-400">
+                   {new Intl.NumberFormat('vi-VN').format(companyRevenueSummary.netRevenue)}
+                 </div>
+                 <p className="text-xs text-gray-600 dark:text-gray-400">Doanh thu ròng</p>
+               </div>
+             </div>
+           </div>
+         </div>
+       )}
 
       {/* Admin: Companies Revenue Table - Show even if loading or no data */}
       {isAdmin() && (

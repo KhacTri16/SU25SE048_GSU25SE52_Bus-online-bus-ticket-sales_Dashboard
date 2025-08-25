@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { CompanyResponse, RouteResponse, CreateRouteRequest, UpdateRouteRequest, Customer, StationResponse, CreateStationRequest, UpdateStationRequest, Station, RoleResponse, CreateRoleRequest, UpdateRoleRequest, Role, BusResponse, LocationResponse, Company, TripResponse, CreateTripRequest, CreateCompanyRequest, Ticket, CompanySettlement, CreateTypeBusWithDiagramRequest, CreateTypeBusWithDiagramResponse, BusTypeResponse, CreateBusRequest, TripStation, CreateTripStationRequest } from '../types/company';
+import { CompanyResponse, RouteResponse, CreateRouteRequest, UpdateRouteRequest, Customer, StationResponse, CreateStationRequest, UpdateStationRequest, Station, RoleResponse, CreateRoleRequest, UpdateRoleRequest, Role, BusResponse, LocationResponse, Company, TripResponse, CreateTripRequest, CreateCompanyRequest, Ticket, CompanySettlement, AdminRevenueSummary, CreateTypeBusWithDiagramRequest, CreateTypeBusWithDiagramResponse, BusType, BusTypeResponse, CreateBusRequest, TripStation, TripStationInfo, CreateTripStationRequest, ChargeRateResponse } from '../types/company';
 
 const baseURL = 'https://bobts-server-e7dxfwh7e5g9e3ad.malaysiawest-01.azurewebsites.net';
 
@@ -86,6 +86,7 @@ export const companyService = {
       if (data.description !== undefined) formData.append('Description', data.description ?? '');
       if (data.maxPercent !== undefined) formData.append('MaxPercent', String(data.maxPercent ?? 0));
       if (data.minPercent !== undefined) formData.append('MinPercent', String(data.minPercent ?? 0));
+      if (data.chargeRateId !== undefined) formData.append('ChargeRateId', String(data.chargeRateId ?? 0));
       if (data.logo) formData.append('Logo', data.logo);
 
       const response = await api.post<Company>('/api/Company', formData, {
@@ -512,6 +513,15 @@ export const tripStationService = {
       throw error;
     }
   },
+  async getStationsByTripId(tripId: number): Promise<TripStationInfo[]> {
+    try {
+      const response = await api.get<TripStationInfo[]>(`/api/Station/trip/${tripId}/stations`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching stations by trip ID:', error);
+      throw error;
+    }
+  },
   async createTripStation(data: CreateTripStationRequest): Promise<any> {
     try {
       const response = await api.post('/api/TripStation', data);
@@ -535,6 +545,15 @@ export const ticketService = {
       return response.data;
     } catch (error) {
       console.error('Error fetching tickets:', error);
+      throw error;
+    }
+  },
+  async getTripStationPassengerCount(tripId: number): Promise<Array<{ tripStationId: number; stationName: string; passengerCount: number; passengers: { ticketId: string; customerFullName: string }[] }>> {
+    try {
+      const response = await api.get<Array<{ tripStationId: number; stationName: string; passengerCount: number; passengers: { ticketId: string; customerFullName: string }[] }>>(`/api/Ticket/trip/${tripId}/station-passenger-count`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching station passenger count:', error);
       throw error;
     }
   },
@@ -715,6 +734,56 @@ export const paymentService = {
     }
   },
 
+  // New API for getting detailed company revenue summary
+  async getCompanyRevenueSummary(companyId: number): Promise<AdminRevenueSummary> {
+    try {
+      console.log(`Fetching detailed revenue summary for company ${companyId}...`);
+      const response = await api.get<AdminRevenueSummary>(`/api/Payment/company/revenue/summary/total`, {
+        params: { companyId },
+      });
+      console.log(`Company ${companyId} revenue summary:`, response.data);
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching revenue summary for company ${companyId}:`, error);
+      throw error;
+    }
+  },
+
+  // New API for getting company monthly revenue
+  async getCompanyMonthlyRevenue(companyId: number, year: number): Promise<number[]> {
+    try {
+      console.log(`Fetching monthly revenue for company ${companyId} in year ${year}...`);
+      
+      // Call the monthly summary API for each month
+      const monthlyData = Array(12).fill(0);
+      
+      for (let month = 1; month <= 12; month++) {
+        try {
+          const monthStr = month.toString().padStart(2, '0');
+          const response = await api.get<AdminRevenueSummary>(`/api/Payment/company/revenue/summary/monthly`, {
+            params: {
+              companyId: companyId,
+              year: year,
+              month: monthStr
+            }
+          });
+          
+          console.log(`Company ${companyId} month ${monthStr} revenue:`, response.data.totalRevenue);
+          monthlyData[month - 1] = response.data.totalRevenue;
+        } catch (error) {
+          console.error(`Error fetching revenue for company ${companyId} month ${month}:`, error);
+          monthlyData[month - 1] = 0;
+        }
+      }
+      
+      console.log(`Company ${companyId} monthly revenue response:`, monthlyData);
+      return monthlyData;
+    } catch (error) {
+      console.error(`Error fetching monthly revenue for company ${companyId}:`, error);
+      return Array(12).fill(0);
+    }
+  },
+
   async getMonthlyRevenue(
     companyId: number,
     year: number,
@@ -740,22 +809,71 @@ export const paymentService = {
   },
 
   // New API for Admin to get total revenue of all companies
-  async getAllCompaniesRevenue(): Promise<TotalRevenueResponse> {
+  async getAllCompaniesRevenue(): Promise<AdminRevenueSummary> {
     try {
       console.log('Fetching total revenue from API...');
-      const response = await api.get<number>('/api/Payment/revenue/total');
+      const response = await api.get<AdminRevenueSummary>('/api/Payment/revenue/summary/total');
       console.log('API Response:', response.data);
       
-      // Since the API returns just a number (total revenue), we need to create the structure
-      // For now, we'll create a mock structure until we get company-specific data
-      const totalRevenue = typeof response.data === 'number' ? response.data : 0;
-      
-      return {
-        totalRevenue,
-        companiesRevenue: [] // Will be populated when we have company-specific endpoints
-      };
+      return response.data;
     } catch (error) {
       console.error('Error fetching total revenue:', error);
+      throw error;
+    }
+  },
+
+  // New API for Admin to get monthly revenue for the entire system
+  async getSystemMonthlyRevenue(year: number): Promise<number[]> {
+    try {
+      console.log(`Fetching system monthly revenue for year ${year}...`);
+      
+      // Call the new monthly summary API for each month
+      const monthlyData = Array(12).fill(0);
+      
+      for (let month = 1; month <= 12; month++) {
+        try {
+          const monthStr = month.toString().padStart(2, '0');
+          const response = await api.get<AdminRevenueSummary>(`/api/Payment/revenue/summary/monthly`, {
+            params: {
+              year: year,
+              month: monthStr
+            }
+          });
+          
+          console.log(`Month ${monthStr} revenue:`, response.data.totalRevenue);
+          monthlyData[month - 1] = response.data.totalRevenue;
+        } catch (error) {
+          console.error(`Error fetching revenue for month ${month}:`, error);
+          monthlyData[month - 1] = 0;
+        }
+      }
+      
+      console.log('System monthly revenue response:', monthlyData);
+      return monthlyData;
+    } catch (error) {
+      console.error('Error fetching system monthly revenue:', error);
+      // Return empty array if API fails
+      return Array(12).fill(0);
+    }
+  },
+
+  // New API for Admin to get detailed monthly revenue for a specific month
+  async getSystemMonthlyRevenueDetail(year: number, month: number): Promise<AdminRevenueSummary> {
+    try {
+      const monthStr = month.toString().padStart(2, '0');
+      console.log(`Fetching detailed monthly revenue for ${year}-${monthStr}...`);
+      
+      const response = await api.get<AdminRevenueSummary>(`/api/Payment/revenue/summary/monthly`, {
+        params: {
+          year: year,
+          month: monthStr
+        }
+      });
+      
+      console.log(`Detailed monthly revenue for ${year}-${monthStr}:`, response.data);
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching detailed monthly revenue for ${year}-${month}:`, error);
       throw error;
     }
   },
@@ -805,8 +923,8 @@ export const paymentService = {
       // Also get the system total for comparison
       let systemTotalRevenue = calculatedTotalRevenue;
       try {
-        const totalRevenueResponse = await api.get<number>('/api/Payment/revenue/total');
-        const apiTotal = typeof totalRevenueResponse.data === 'number' ? totalRevenueResponse.data : 0;
+        const totalRevenueResponse = await api.get<AdminRevenueSummary>('/api/Payment/revenue/summary/total');
+        const apiTotal = totalRevenueResponse.data.totalRevenue;
         console.log('API total vs calculated total:', { apiTotal, calculatedTotal: calculatedTotalRevenue });
         // Use the API total as it might be more accurate
         systemTotalRevenue = apiTotal;
@@ -905,6 +1023,24 @@ export const systemUserService = {
       throw error;
     }
   }
+};
+
+export const chargeRateService = {
+  async getAllChargeRates(page: number = 1, amount: number = 50): Promise<ChargeRateResponse> {
+    try {
+      const response = await api.get<ChargeRateResponse>('/api/ChargeRate', {
+        params: {
+          Page: page,
+          Amount: amount,
+          All: true
+        }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching charge rates:', error);
+      throw error;
+    }
+  },
 };
 
 export default api;

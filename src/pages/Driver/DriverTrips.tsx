@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router';
 import { tripService } from '../../services/api';
 import { Trip } from '../../types/company';
 import { useAuth } from '../../context/AuthContext';
@@ -8,6 +9,7 @@ export default function DriverTrips() {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchTrips = async () => {
@@ -79,7 +81,7 @@ export default function DriverTrips() {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200 dark:bg-transparent dark:divide-gray-800">
               {trips.map(t => (
-                <tr key={t.id}>
+                <tr key={t.id} className="cursor-pointer hover:bg-gray-50 dark:hover:bg-white/[0.02]" onClick={() => navigate(`/driver-trips/${t.id}/passengers`)}>
                   <td className="px-4 py-2 text-sm text-gray-900 dark:text-white">{t.tripId}</td>
                   <td className="px-4 py-2 text-sm text-gray-900 dark:text-white">{t.fromLocation} → {t.endLocation}</td>
                   <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300">{new Date(t.timeStart).toLocaleString('vi-VN')}</td>
@@ -100,5 +102,6 @@ export default function DriverTrips() {
     </div>
   );
 }
+
 
 

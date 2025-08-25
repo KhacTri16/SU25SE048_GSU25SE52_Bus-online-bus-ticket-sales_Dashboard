@@ -14,6 +14,25 @@ export interface Company {
   minPercent: number;
 }
 
+export interface ChargeRate {
+  id: number;
+  name: string;
+  rate: number;
+  endDate: string;
+  createAt: string;
+  updateAt: string;
+  note: string;
+  isDeleted: boolean;
+}
+
+export interface ChargeRateResponse {
+  data: ChargeRate[];
+  page: number;
+  amount: number;
+  totalPage: number;
+  totalCount: number;
+}
+
 export interface CompanyResponse {
   data: Company[];
   page: number;
@@ -238,6 +257,7 @@ export interface CreateCompanyRequest {
   description?: string;
   maxPercent?: number;
   minPercent?: number;
+  chargeRateId?: number;
   logo?: File | null;
 }
 
@@ -271,6 +291,16 @@ export interface TripStation {
   description: string;
 }
 
+// Station for trip (from /api/Station/trip/{tripId}/stations)
+export interface TripStationInfo {
+  id: number;
+  stationId: string;
+  name: string;
+  locationName: string;
+  status: number;
+  isDeleted: boolean;
+}
+
 // Create Trip Station Request
 export interface CreateTripStationRequest {
   tripStationId: string;
@@ -293,6 +323,14 @@ export interface CompanySettlement {
   status: number;
   createdAt: string;
   excelReportUrl: string;
+}
+
+// Admin revenue summary response
+export interface AdminRevenueSummary {
+  totalRevenue: number;
+  totalRefunded: number;
+  systemFee: number;
+  netRevenue: number;
 }
 
 // TypeBus + Diagram

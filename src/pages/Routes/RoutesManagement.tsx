@@ -1,6 +1,6 @@
 import { useState, useEffect, Fragment } from "react";
-import { Route, CreateRouteRequest, UpdateRouteRequest, Trip, CreateTripRequest, Bus, TripStation } from "../../types/company";
-import { routeService, companyService, tripService, busService, systemUserService, SystemUser, tripStationService } from "../../services/api";
+import { Route, CreateRouteRequest, UpdateRouteRequest, Trip, CreateTripRequest, Bus, Station, TripStation, TripStationInfo } from "../../types/company";
+import { routeService, companyService, tripService, busService, systemUserService, SystemUser, tripStationService, stationService } from "../../services/api";
 import PageMeta from "../../components/common/PageMeta";
 import RouteFormModal from "../../components/Routes/RouteFormModal";
 import DeleteConfirmModal from "../../components/Routes/DeleteConfirmModal";
@@ -33,7 +33,7 @@ export default function RoutesManagement() {
   const [buses, setBuses] = useState<Bus[]>([]);
   const [drivers, setDrivers] = useState<SystemUser[]>([]);
   const [expandedTripIds, setExpandedTripIds] = useState<Record<number, boolean>>({});
-  const [tripStationByTripId, setTripStationByTripId] = useState<Record<number, { loading: boolean; error?: string | null; station?: { id: number; name: string; price: number; time: string; description: string } | null }>>({});
+  const [tripStationByTripId, setTripStationByTripId] = useState<Record<number, { loading: boolean; error?: string | null; stations?: TripStationInfo[] | null }>>({});
   
   // Trip Station Creation Modal
   const [isTripStationModalOpen, setIsTripStationModalOpen] = useState(false);
@@ -47,6 +47,8 @@ export default function RoutesManagement() {
     description: string;
   } | null>(null);
   const [tripStations, setTripStations] = useState<TripStation[]>([]);
+  const [allStations, setAllStations] = useState<Station[]>([]);
+  const [loadingStations, setLoadingStations] = useState<boolean>(false);
 
   useEffect(() => {
     fetchRoutes();
@@ -389,6 +391,23 @@ export default function RoutesManagement() {
       description: ''
     });
     setIsTripStationModalOpen(true);
+
+    // Load stations for selection when opening modal
+    if (allStations.length === 0) {
+      (async () => {
+        try {
+          setLoadingStations(true);
+          const res = await stationService.getAllStations();
+          const list = (res.data || []).filter(s => !s.isDeleted);
+          setAllStations(list);
+        } catch (e) {
+          console.error('Error fetching stations for selection:', e);
+          setAllStations([]);
+        } finally {
+          setLoadingStations(false);
+        }
+      })();
+    }
   };
 
   const handleCreateTripStation = async () => {
@@ -401,18 +420,12 @@ export default function RoutesManagement() {
       // Refresh the trip station data
       setTripStationByTripId(prev => ({ ...prev, [creatingStationForTrip.id]: { loading: true } }));
       try {
-        const station = await tripStationService.getTripStationById(creatingStationForTrip.id);
+        const stations = await tripStationService.getStationsByTripId(creatingStationForTrip.id);
         setTripStationByTripId(prev => ({
           ...prev,
           [creatingStationForTrip.id]: {
             loading: false,
-            station: {
-              id: station.id,
-              name: station.stationName,
-              price: station.price,
-              time: station.pickUpTime,
-              description: station.description,
-            }
+            stations: stations
           }
         }));
       } catch (e) {
@@ -488,19 +501,13 @@ export default function RoutesManagement() {
     if (!tripStationByTripId[trip.id]) {
       setTripStationByTripId(prev => ({ ...prev, [trip.id]: { loading: true } }));
       try {
-        // API requires TripStation id; using example pattern, try trip.id directly
-        const station = await tripStationService.getTripStationById(trip.id);
+        // Use the correct API endpoint to get stations for this trip
+        const stations = await tripStationService.getStationsByTripId(trip.id);
         setTripStationByTripId(prev => ({
           ...prev,
           [trip.id]: {
             loading: false,
-            station: {
-              id: station.id,
-              name: station.stationName,
-              price: station.price,
-              time: station.pickUpTime,
-              description: station.description,
-            }
+            stations: stations
           }
         }));
       } catch (e) {
@@ -545,23 +552,38 @@ export default function RoutesManagement() {
                   <div className="flex items-center justify-between">
                     <div className="text-red-600 dark:text-red-400">{stationInfo.error}</div>
                   </div>
-                ) : stationInfo.station ? (
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div>
-                      <div className="text-gray-500 dark:text-gray-400">Trạm</div>
-                      <div className="font-medium text-gray-900 dark:text-white">{stationInfo.station.name}</div>
+                ) : stationInfo.stations && stationInfo.stations.length > 0 ? (
+                  <div className="space-y-3">
+                    <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Danh sách trạm ({stationInfo.stations.length} trạm):
                     </div>
-                    <div>
-                      <div className="text-gray-500 dark:text-gray-400">Giá</div>
-                      <div className="font-medium text-gray-900 dark:text-white">{stationInfo.station.price.toLocaleString('vi-VN')} đ</div>
-                    </div>
-                    <div>
-                      <div className="text-gray-500 dark:text-gray-400">Giờ đón</div>
-                      <div className="font-medium text-gray-900 dark:text-white">{new Date(stationInfo.station.time).toLocaleString('vi-VN')}</div>
-                    </div>
-                    <div>
-                      <div className="text-gray-500 dark:text-gray-400">Mô tả</div>
-                      <div className="font-medium text-gray-900 dark:text-white">{stationInfo.station.description}</div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {stationInfo.stations.map((station, index) => (
+                        <div key={station.id} className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Trạm {index + 1}</span>
+                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                              station.status === 0 ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400' : 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400'
+                            }`}>
+                              {station.status === 0 ? 'Hoạt động' : 'Tạm dừng'}
+                            </span>
+                          </div>
+                          <div className="space-y-1">
+                            <div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400">Mã trạm</div>
+                              <div className="text-sm font-medium text-gray-900 dark:text-white">{station.stationId}</div>
+                            </div>
+                            <div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400">Tên trạm</div>
+                              <div className="text-sm font-medium text-gray-900 dark:text-white">{station.name}</div>
+                            </div>
+                            <div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400">Địa điểm</div>
+                              <div className="text-sm font-medium text-gray-900 dark:text-white">{station.locationName}</div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 ) : (
@@ -1116,11 +1138,12 @@ export default function RoutesManagement() {
                   value={newTripStation.stationId}
                   onChange={(e) => setNewTripStation({ ...newTripStation, stationId: parseInt(e.target.value) || 0 })}
                   className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                  disabled={loadingStations}
                 >
-                  <option value={0}>-- Chọn trạm --</option>
-                  {tripStations.map((station) => (
+                  <option value={0}>{loadingStations ? 'Đang tải...' : '-- Chọn trạm --'}</option>
+                  {allStations.map((station) => (
                     <option key={station.id} value={station.id}>
-                      {station.stationName}
+                      {station.name} - {station.locationName}
                     </option>
                   ))}
                 </select>
