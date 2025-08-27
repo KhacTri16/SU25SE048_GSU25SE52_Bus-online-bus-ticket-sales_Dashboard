@@ -1,5 +1,5 @@
 import { useState, useEffect, Fragment } from "react";
-import { Route, CreateRouteRequest, UpdateRouteRequest, Trip, CreateTripRequest, Bus, Station, TripStationInfo } from "../../types/company";
+import { Route, CreateRouteRequest, UpdateRouteRequest, Trip, CreateTripRequest, Bus, Station, TripStation, TripStationInfo } from "../../types/company";
 import { routeService, companyService, tripService, busService, systemUserService, SystemUser, tripStationService, stationService } from "../../services/api";
 import PageMeta from "../../components/common/PageMeta";
 import RouteFormModal from "../../components/Routes/RouteFormModal";
@@ -46,6 +46,7 @@ export default function RoutesManagement() {
     pickUpTime: string;
     description: string;
   } | null>(null);
+  const [tripStations, setTripStations] = useState<TripStation[]>([]);
   const [allStations, setAllStations] = useState<Station[]>([]);
   const [loadingStations, setLoadingStations] = useState<boolean>(false);
 
@@ -106,8 +107,8 @@ export default function RoutesManagement() {
   useEffect(() => {
     (async () => {
       try {
-        await tripStationService.getAllTripStations();
-        // Trip stations data fetched but not stored for now
+        const res = await tripStationService.getAllTripStations();
+        setTripStations(res.data || []);
       } catch (e) {
         console.error('Error fetching trip stations for trip station creation:', e);
       }
@@ -203,9 +204,15 @@ export default function RoutesManagement() {
       return;
     }
     setCreatingTripForRoute(route);
+    // Use local wall time strings without automatic UTC conversion
+    const pad2 = (n: number) => (n < 10 ? `0${n}` : `${n}`);
+    const now = new Date();
+    const start = `${now.getFullYear()}-${pad2(now.getMonth()+1)}-${pad2(now.getDate())}T${pad2(now.getHours())}:${pad2(now.getMinutes())}:00`;
+    const endDate = new Date(now.getTime() + 3600000);
+    const end = `${endDate.getFullYear()}-${pad2(endDate.getMonth()+1)}-${pad2(endDate.getDate())}T${pad2(endDate.getHours())}:${pad2(endDate.getMinutes())}:00`;
     setNewTrip({
-      timeStart: new Date().toISOString(),
-      timeEnd: new Date(Date.now() + 3600000).toISOString(),
+      timeStart: start,
+      timeEnd: end,
       price: 0,
       routeId: route.id,
       busId: 0,
@@ -462,18 +469,24 @@ export default function RoutesManagement() {
   };
 
 
-  // Local datetime helpers (no manual timezone math)
-  const pad2 = (n: number) => (n < 10 ? `0${n}` : `${n}`);
-  const formatDateTimeLocal = (isoString: string) => {
-    const d = new Date(isoString);
-    const yyyy = d.getFullYear();
-    const mm = pad2(d.getMonth() + 1);
-    const dd = pad2(d.getDate());
-    const hh = pad2(d.getHours());
-    const mi = pad2(d.getMinutes());
-    return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+  // Local datetime helpers (avoid unintended timezone shift when sending to backend)
+  const pad2Local = (n: number) => (n < 10 ? `0${n}` : `${n}`);
+  const formatDateTimeLocal = (raw: string) => {
+    if (!raw) return '';
+    if (/Z$/.test(raw)) { // backend returned UTC -> display local
+      const d = new Date(raw);
+      return `${d.getFullYear()}-${pad2Local(d.getMonth()+1)}-${pad2Local(d.getDate())}T${pad2Local(d.getHours())}:${pad2Local(d.getMinutes())}`;
+    }
+    // if already contains seconds, trim
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:/.test(raw)) return raw.slice(0,16);
+    return raw;
   };
-  const localDateTimeToISO = (localValue: string) => new Date(localValue).toISOString();
+  const localDateTimeToISO = (val: string) => {
+    if (!val) return '';
+    // Append seconds if missing, keep as local naive string (assumes backend interprets as local)
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(val)) return `${val}:00`;
+    return val;
+  };
 
   const getStatusBadge = (route: Route) => {
     if (route.isDelete) {

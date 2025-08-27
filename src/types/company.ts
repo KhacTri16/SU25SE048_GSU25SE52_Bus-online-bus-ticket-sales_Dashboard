@@ -217,6 +217,59 @@ export interface TripResponse {
   totalCount: number;
 }
 
+// Trip search (by company) extended trip with station ids & route description
+export interface TripSearchTrip extends Trip {
+  routeDescription?: string;
+  fromStationId?: number;
+  toStationId?: number;
+}
+
+export interface TransferTripItem {
+  firstTrip: TripSearchTrip;
+  secondTrip: TripSearchTrip;
+}
+
+export interface TripleTripItem {
+  firstTrip: TripSearchTrip;
+  secondTrip: TripSearchTrip;
+  thirdTrip: TripSearchTrip;
+}
+
+export interface TripSearchByCompanyResponse {
+  isDirect: boolean;
+  directTrips: TripSearchTrip[];
+  transferTrips: TransferTripItem[];
+  tripleTrips: TripleTripItem[];
+}
+
+// Seat availability for a trip segment
+export interface SeatAvailability {
+  id: number;
+  seatId: string;
+  isAvailable: boolean;
+}
+
+// Reservation (counter) request & response
+export interface CounterTripSeatRequest {
+  tripId: number;
+  fromStationId?: number;
+  toStationId?: number;
+  seatIds: number[]; // backend appears to expect numeric seat primary keys
+}
+
+export interface CounterReservationRequest {
+  customerId: number; // 0 if walk-in / unknown
+  isReturn: boolean;  // false for one-way
+  tripSeats: CounterTripSeatRequest[];
+  returnTripSeats?: CounterTripSeatRequest[]; // optional when isReturn true
+}
+
+export interface CounterReservationResponse {
+  success: boolean;
+  message: string;
+  paymentUrl?: string | null;
+}
+
 export interface CreateTripRequest {
   timeStart: string; // ISO string
   timeEnd: string;   // ISO string
@@ -275,6 +328,7 @@ export interface Ticket {
   timeStart: string;
   timeEnd: string;
   qrCodeUrl: string;
+  pdfUrl?: string; // thêm trường pdfUrl từ response /api/Ticket/by-user
   companyName: string;
   status: number;
 }

@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { CompanyResponse, RouteResponse, CreateRouteRequest, UpdateRouteRequest, Customer, StationResponse, CreateStationRequest, UpdateStationRequest, Station, RoleResponse, CreateRoleRequest, UpdateRoleRequest, Role, BusResponse, LocationResponse, Company, TripResponse, CreateTripRequest, CreateCompanyRequest, Ticket, CompanySettlement, AdminRevenueSummary, CreateTypeBusWithDiagramRequest, CreateTypeBusWithDiagramResponse, BusTypeResponse, CreateBusRequest, TripStation, TripStationInfo, CreateTripStationRequest, ChargeRateResponse } from '../types/company';
+import { CompanyResponse, RouteResponse, CreateRouteRequest, UpdateRouteRequest, Customer, StationResponse, CreateStationRequest, UpdateStationRequest, Station, RoleResponse, CreateRoleRequest, UpdateRoleRequest, Role, BusResponse, LocationResponse, Company, TripResponse, CreateTripRequest, CreateCompanyRequest, Ticket, CompanySettlement, AdminRevenueSummary, CreateTypeBusWithDiagramRequest, CreateTypeBusWithDiagramResponse, BusType, BusTypeResponse, CreateBusRequest, TripStation, TripStationInfo, CreateTripStationRequest, ChargeRateResponse, TripSearchByCompanyResponse, SeatAvailability, CounterReservationRequest, CounterReservationResponse } from '../types/company';
 
 const baseURL = 'https://bobts-server-e7dxfwh7e5g9e3ad.malaysiawest-01.azurewebsites.net';
 
@@ -488,6 +488,98 @@ export const tripService = {
       throw error;
     }
   },
+  async searchTripsByCompany(params: {
+    FromLocationId?: number;
+    FromStationId?: number;
+    ToLocationId?: number;
+    ToStationId?: number;
+    Date?: string; // YYYY-MM-DD
+    companyId: number;
+    DirectTripsPagination?: { Page?: number; Amount?: number; All?: boolean };
+    TransferTripsPagination?: { Page?: number; Amount?: number; All?: boolean };
+    TripleTripsPagination?: { Page?: number; Amount?: number; All?: boolean };
+  }): Promise<TripSearchByCompanyResponse> {
+    try {
+      const query: any = {
+        companyId: params.companyId,
+        'DirectTripsPagination.Page': params.DirectTripsPagination?.Page ?? 0,
+        'DirectTripsPagination.Amount': params.DirectTripsPagination?.Amount ?? 50,
+        'DirectTripsPagination.All': params.DirectTripsPagination?.All ?? true,
+        'TransferTripsPagination.Page': params.TransferTripsPagination?.Page ?? 0,
+        'TransferTripsPagination.Amount': params.TransferTripsPagination?.Amount ?? 50,
+        'TransferTripsPagination.All': params.TransferTripsPagination?.All ?? true,
+        'TripleTripsPagination.Page': params.TripleTripsPagination?.Page ?? 0,
+        'TripleTripsPagination.Amount': params.TripleTripsPagination?.Amount ?? 50,
+        'TripleTripsPagination.All': params.TripleTripsPagination?.All ?? true,
+      };
+      if (params.FromLocationId) query.FromLocationId = params.FromLocationId;
+      if (params.FromStationId) query.FromStationId = params.FromStationId;
+      if (params.ToLocationId) query.ToLocationId = params.ToLocationId;
+      if (params.ToStationId) query.ToStationId = params.ToStationId;
+      if (params.Date) query.Date = params.Date;
+      const res = await api.get<TripSearchByCompanyResponse>('/api/Trip/search/by-company', { params: query });
+      return res.data;
+    } catch (error) {
+      console.error('Error searching trips by company:', error);
+      throw error;
+    }
+  },
+  async getSeatAvailability(tripId: number, fromStationId?: number, toStationId?: number): Promise<SeatAvailability[]> {
+    try {
+      const res = await api.get<SeatAvailability[]>(`/api/Trip/${tripId}/seat-availability`, {
+        params: {
+          fromStationId,
+          toStationId,
+        }
+      });
+      return res.data;
+    } catch (error) {
+      console.error('Error fetching seat availability:', error);
+      throw error;
+    }
+  },
+  async completeTrip(tripId: number): Promise<string> {
+    // Some environments may expose this action via different verb/path.
+    // We'll attempt a small cascade of likely endpoints/methods.
+    const attempts: Array<{ method: 'post' | 'put'; url: string; body?: any; description: string }> = [
+      { method: 'post', url: `/api/Trip/complete/${tripId}`, description: 'POST /api/Trip/complete/{id}' },
+      { method: 'put', url: `/api/Trip/complete/${tripId}`, description: 'PUT /api/Trip/complete/{id}' },
+      { method: 'put', url: `/api/Trip/${tripId}/complete`, description: 'PUT /api/Trip/{id}/complete' },
+      { method: 'post', url: `/api/Trip/complete`, body: { tripId }, description: 'POST /api/Trip/complete { tripId } body' },
+      { method: 'put', url: `/api/Trip/complete`, body: { tripId }, description: 'PUT /api/Trip/complete { tripId } body' },
+    ];
+
+    const errors: string[] = [];
+    for (const attempt of attempts) {
+      try {
+        const res = await (attempt.method === 'post'
+          ? api.post<string>(attempt.url, attempt.body)
+          : api.put<string>(attempt.url, attempt.body));
+        return typeof res.data === 'string' ? res.data : 'Hoàn thành chuyến thành công';
+      } catch (err: any) {
+        const status = err?.response?.status;
+        const data = err?.response?.data;
+        errors.push(`${attempt.description} -> ${status || 'ERR'} ${typeof data === 'string' ? data : ''}`);
+        // If not 404/405 continue; other errors likely auth/validation so break early
+        if (status && ![404, 405].includes(status)) {
+          break;
+        }
+      }
+    }
+    throw new Error('Hoàn thành chuyến thất bại. Thử các endpoint không thành công: ' + errors.join(' | '));
+  }
+};
+
+export const reservationService = {
+  async createCounterReservation(data: CounterReservationRequest): Promise<CounterReservationResponse> {
+    try {
+      const res = await api.post<CounterReservationResponse>('/api/Reservations/counter', data);
+      return res.data;
+    } catch (error) {
+      console.error('Error creating counter reservation:', error);
+      throw error;
+    }
+  }
 };
 
 export const tripStationService = {
@@ -566,6 +658,15 @@ export const ticketService = {
       throw error;
     }
   },
+  async getTicketsBySystemUser(systemUserId: number): Promise<Ticket[]> {
+    try {
+      const response = await api.get<Ticket[]>(`/api/Ticket/by-user/${systemUserId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching tickets by system user:', error);
+      throw error;
+    }
+  }
 };
 
 // Auth Service

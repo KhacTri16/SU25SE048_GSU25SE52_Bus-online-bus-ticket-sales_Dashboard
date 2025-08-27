@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   ArrowUpIcon,
+  ArrowDownIcon,
   BoxIconLine,
   GroupIcon,
   DollarLineIcon,

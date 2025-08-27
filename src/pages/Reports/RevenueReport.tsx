@@ -10,6 +10,7 @@ export default function RevenueReport() {
   const { getUserCompanyId, isAdmin } = authContext;
   const [year, setYear] = useState<number>(new Date().getFullYear());
   const [monthlyRevenue, setMonthlyRevenue] = useState<number[]>(Array(12).fill(0));
+  const [totalRevenue, setTotalRevenue] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [companyName, setCompanyName] = useState<string>("");
   
@@ -129,6 +130,7 @@ export default function RevenueReport() {
            
            if (!companyId) {
              console.warn('No company ID found for user');
+             setTotalRevenue(0);
              setMonthlyRevenue(Array(12).fill(0));
              return;
            }
@@ -150,10 +152,12 @@ export default function RevenueReport() {
                console.log('Fetching company revenue summary...');
                const companyRevenueData = await paymentService.getCompanyRevenueSummary(companyId);
                setCompanyRevenueSummary(companyRevenueData);
+               setTotalRevenue(companyRevenueData.totalRevenue);
                console.log('Company revenue summary:', companyRevenueData);
              } catch (error) {
                console.error('Error fetching company revenue summary:', error);
                setCompanyRevenueSummary(null);
+               setTotalRevenue(0);
              }
 
                            // Fetch monthly revenue using new API
@@ -200,6 +204,7 @@ export default function RevenueReport() {
              }
            } catch (error) {
              console.error(`Error fetching revenue for company ${companyId}:`, error);
+             setTotalRevenue(0);
              setMonthlyRevenue(Array(12).fill(0));
              setSettlements([]);
              setCompanyRevenueSummary(null);
@@ -210,6 +215,7 @@ export default function RevenueReport() {
         setMonthlyRevenue(Array(12).fill(0));
         setAllCompaniesData([]);
         setSystemTotalRevenue(null);
+        setTotalRevenue(null);
         setSettlements([]);
       } finally {
         setIsLoading(false);

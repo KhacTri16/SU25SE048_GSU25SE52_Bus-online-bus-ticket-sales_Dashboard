@@ -33,6 +33,8 @@ import AuthGuard from "./components/auth/AuthGuard";
 import { Component, ReactNode } from "react";
 import RevenueReport from "./pages/Reports/RevenueReport";
 import TicketList from "./pages/Tickets/TicketList";
+import TicketSale from "./pages/Tickets/TicketSale";
+import StaffSoldTickets from "./pages/Tickets/StaffSoldTickets";
 import DriverTrips from "./pages/Driver/DriverTrips";
 import DriverTripPassengers from "./pages/Driver/DriverTripPassengers";
 
@@ -170,6 +172,22 @@ export default function App() {
                             element={
                               <AuthGuard requiredPermission="reports.read">
                                 <TicketList />
+                              </AuthGuard>
+                            }
+                          />
+                          <Route
+                            path="ticket-sale"
+                            element={
+                              <AuthGuard requiredRole="staff">
+                                <TicketSale />
+                              </AuthGuard>
+                            }
+                          />
+                          <Route
+                            path="staff-sold-tickets"
+                            element={
+                              <AuthGuard requiredRole="staff">
+                                <StaffSoldTickets />
                               </AuthGuard>
                             }
                           />

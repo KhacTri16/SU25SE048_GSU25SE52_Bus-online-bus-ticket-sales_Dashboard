@@ -16,6 +16,7 @@ import {
   GroupIcon,
 } from "../icons";
 import { useSidebar } from "../context/SidebarContext";
+import { useAuth } from "../context/AuthContext";
 import SidebarWidget from "./SidebarWidget";
 
 type NavItem = {
@@ -25,7 +26,7 @@ type NavItem = {
   subItems?: { name: string; path: string; pro?: boolean; new?: boolean }[];
 };
 
-const navItems: NavItem[] = [
+const baseNavItems: NavItem[] = [
   {
     icon: <GridIcon />,
     name: "Dashboard",
@@ -69,13 +70,7 @@ const navItems: NavItem[] = [
       { name: "Doanh thu", path: "/reports/revenue", pro: false },
     ],
   },
-  {
-    name: "Quản lý vé",
-    icon: <TableIcon />,
-    subItems: [
-      { name: "Danh sách vé", path: "/tickets", pro: false },
-    ],
-  },
+  // Ticket management will be appended dynamically based on role
 ];
 
 const othersItems: NavItem[] = [
@@ -100,6 +95,22 @@ const othersItems: NavItem[] = [
 
 const AppSidebar: React.FC = () => {
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
+  const { isStaff } = useAuth();
+  // Memoize nav items with conditional ticket section
+  const navItems: NavItem[] = [
+    ...baseNavItems,
+    {
+      name: "Quản lý vé",
+      icon: <TableIcon />,
+      subItems: [
+        { name: "Danh sách vé", path: "/tickets", pro: false },
+        ...(isStaff() ? [
+          { name: "Bán vé", path: "/ticket-sale", pro: false },
+          { name: "Vé đã bán tại quầy", path: "/staff-sold-tickets", pro: false },
+        ] : []),
+      ],
+    },
+  ];
   const location = useLocation();
 
   const [openSubmenu, setOpenSubmenu] = useState<{
