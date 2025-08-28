@@ -4,9 +4,10 @@ import { useAuth } from "../../context/AuthContext";
 import { ticketService, companyService, paymentService } from "../../services/api";
 
 export default function RevenueChart() {
-  const { getUserCompanyId, isAdmin } = useAuth();
+  const { getUserCompanyId, isAdmin, isCompanyRestricted } = useAuth();
   const [year, setYear] = useState<number>(new Date().getFullYear());
   const [monthlyRevenue, setMonthlyRevenue] = useState<number[]>(Array(12).fill(0));
+  const [totalRevenue, setTotalRevenue] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
   const options = useMemo(() => ({
@@ -30,11 +31,6 @@ export default function RevenueChart() {
 
   const series = useMemo(() => ([{ name: isAdmin() ? "Tổng doanh thu hệ thống" : "Doanh thu", data: monthlyRevenue }]), [monthlyRevenue, isAdmin]);
 
-  // Calculate total revenue from monthly data
-  const totalRevenue = useMemo(() => {
-    return monthlyRevenue.reduce((a, b) => a + b, 0);
-  }, [monthlyRevenue]);
-
   useEffect(() => {
     const fetchRevenue = async () => {
       setIsLoading(true);
@@ -46,15 +42,21 @@ export default function RevenueChart() {
             const systemMonthlyData = await paymentService.getSystemMonthlyRevenue(year);
             setMonthlyRevenue(systemMonthlyData);
             console.log('System monthly revenue:', systemMonthlyData);
+            
+            // Calculate total revenue from monthly data
+            const total = systemMonthlyData.reduce((a, b) => a + b, 0);
+            setTotalRevenue(total);
           } catch (error) {
             console.error('Error fetching system monthly revenue:', error);
             setMonthlyRevenue(Array(12).fill(0));
+            setTotalRevenue(0);
           }
         } else {
           // Non-admin: Fetch company-specific data
           const companyId = getUserCompanyId();
           if (!companyId) {
             console.warn('No company ID found for user');
+            setTotalRevenue(0);
             setMonthlyRevenue(Array(12).fill(0));
             return;
           }
@@ -65,6 +67,10 @@ export default function RevenueChart() {
             const companyMonthlyData = await paymentService.getCompanyMonthlyRevenue(companyId, year);
             setMonthlyRevenue(companyMonthlyData);
             console.log(`Company ${companyId} monthly revenue (from API):`, companyMonthlyData);
+            
+            // Calculate total revenue from monthly data
+            const total = companyMonthlyData.reduce((a, b) => a + b, 0);
+            setTotalRevenue(total);
           } catch (error) {
             console.error('Error fetching company monthly revenue:', error);
             // Fallback to ticket computation if API fails
@@ -85,12 +91,14 @@ export default function RevenueChart() {
               }
             });
             setMonthlyRevenue(monthly);
+            setTotalRevenue(monthly.reduce((a, b) => a + b, 0));
             console.log(`Company ${companyId} monthly revenue (fallback computed):`, monthly);
           }
         }
       } catch (err) {
         console.error('Error fetching revenue data:', err);
         setMonthlyRevenue(Array(12).fill(0));
+        setTotalRevenue(0);
       } finally {
         setIsLoading(false);
       }
@@ -131,7 +139,10 @@ export default function RevenueChart() {
       <div className={`grid ${isAdmin() ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-2 md:grid-cols-4'} gap-4 mt-6 pt-6 border-t border-gray-200 dark:border-gray-800`}>
         <div className="text-center">
           <p className="text-2xl font-bold text-gray-900 dark:text-white">
-            {isLoading ? '...' : new Intl.NumberFormat('vi-VN').format(totalRevenue)}
+            {isAdmin() 
+              ? (totalRevenue === null ? (isLoading ? '...' : '0') : new Intl.NumberFormat('vi-VN').format(totalRevenue))
+              : (totalRevenue === null ? (isLoading ? '...' : '0') : new Intl.NumberFormat('vi-VN').format(totalRevenue))
+            }
           </p>
           <p className="text-sm text-gray-500 dark:text-gray-400">
             {isAdmin() ? "Tổng doanh thu hệ thống" : "Tổng doanh thu công ty"}

@@ -19,6 +19,8 @@ export default function CompanyList() {
     data?: any;
     error?: string;
   } | null>(null);
+  // Track periods already settled per company (key format YYYY-MM)
+  const [settledPeriods, setSettledPeriods] = useState<Record<number, Set<string>>>({});
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState<CreateCompanyRequest>({
@@ -364,7 +366,13 @@ export default function CompanyList() {
                         />
                         <button
                           className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-xs font-medium disabled:opacity-50"
-                          disabled={settlingCompany === company.id || !(periodByCompany[company.id])}
+                          disabled={
+                            settlingCompany === company.id ||
+                            !periodByCompany[company.id] ||
+                            (periodByCompany[company.id]
+                              ? (settledPeriods[company.id]?.has(periodByCompany[company.id]!) ?? false)
+                              : false)
+                          }
                           onClick={async () => {
                             const period = periodByCompany[company.id];
                             if (!period) {
@@ -376,6 +384,34 @@ export default function CompanyList() {
                               });
                               return;
                             }
+                            // Ensure only one settlement per company per month
+                            try {
+                              // If we don't have cached periods for this company, fetch them
+                              if (!settledPeriods[company.id]) {
+                                const existing = await companyService.getCompanySettlements(company.id);
+                                const periodSet = new Set<string>();
+                                existing.forEach(s => {
+                                  if (s.period) {
+                                    const key = s.period.slice(0,7); // YYYY-MM
+                                    periodSet.add(key);
+                                  }
+                                });
+                                setSettledPeriods(prev => ({ ...prev, [company.id]: periodSet }));
+                              }
+                              // After potential fetch, check again
+                              const already = (settledPeriods[company.id]?.has(period)) || false;
+                              if (already) {
+                                setSettlementResult({
+                                  type: 'error',
+                                  company,
+                                  period,
+                                  error: 'Kỳ quyết toán này đã được tạo trước đó. Mỗi tháng chỉ tạo 1 lần.'
+                                });
+                                return;
+                              }
+                            } catch (prefetchErr:any) {
+                              console.warn('Không thể tải danh sách quyết toán trước khi tạo, tiếp tục:', prefetchErr);
+                            }
                             try {
                               setSettlingCompany(company.id);
                               const result = await companyService.createSettlement(company.id, period);
@@ -385,6 +421,14 @@ export default function CompanyList() {
                                 company,
                                 period,
                                 data: result
+                              });
+                              // Mark period as settled
+                              setSettledPeriods(prev => {
+                                const copy = { ...prev };
+                                const set = new Set(copy[company.id] || []);
+                                set.add(period);
+                                copy[company.id] = set;
+                                return copy;
                               });
                             } catch (err: any) {
                               setSettlementResult({
@@ -398,7 +442,11 @@ export default function CompanyList() {
                             }
                           }}
                         >
-                          {settlingCompany === company.id ? 'Đang tạo...' : 'Tạo quyết toán'}
+                          {settlingCompany === company.id
+                            ? 'Đang tạo...'
+                            : (periodByCompany[company.id] && (settledPeriods[company.id]?.has(periodByCompany[company.id]!) ?? false)
+                                ? 'Đã quyết toán'
+                                : 'Tạo quyết toán')}
                         </button>
                       </div>
                     </td>

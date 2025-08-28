@@ -660,8 +660,17 @@ export const ticketService = {
   },
   async getTicketsBySystemUser(systemUserId: number): Promise<Ticket[]> {
     try {
-      const response = await api.get<Ticket[]>(`/api/Ticket/by-user/${systemUserId}`);
-      return response.data;
+      const response = await api.get<any>(`/api/Ticket/by-user/${systemUserId}`);
+      const payload = response.data;
+      // Normalize various possible backend shapes to Ticket[]
+      if (Array.isArray(payload)) return payload as Ticket[];
+      if (payload && Array.isArray(payload.data)) return payload.data as Ticket[];
+      if (payload && typeof payload === 'object') {
+        // Single ticket object case
+        if (payload.ticketId) return [payload as Ticket];
+      }
+      console.warn('getTicketsBySystemUser: Unexpected response shape, returning empty array', payload);
+      return [];
     } catch (error) {
       console.error('Error fetching tickets by system user:', error);
       throw error;
