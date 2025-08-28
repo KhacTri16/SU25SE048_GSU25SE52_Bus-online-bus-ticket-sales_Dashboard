@@ -1,5 +1,5 @@
 import { useState, useEffect, Fragment } from "react";
-import { Route, CreateRouteRequest, UpdateRouteRequest, Trip, CreateTripRequest, Bus, Station, TripStation, TripStationInfo } from "../../types/company";
+import { Route, CreateRouteRequest, UpdateRouteRequest, Trip, CreateTripRequest, Bus, Station, TripStationInfo } from "../../types/company";
 import { routeService, companyService, tripService, busService, systemUserService, SystemUser, tripStationService, stationService } from "../../services/api";
 import PageMeta from "../../components/common/PageMeta";
 import RouteFormModal from "../../components/Routes/RouteFormModal";
@@ -46,7 +46,6 @@ export default function RoutesManagement() {
     pickUpTime: string;
     description: string;
   } | null>(null);
-  const [tripStations, setTripStations] = useState<TripStation[]>([]);
   const [allStations, setAllStations] = useState<Station[]>([]);
   const [loadingStations, setLoadingStations] = useState<boolean>(false);
 
@@ -108,7 +107,7 @@ export default function RoutesManagement() {
     (async () => {
       try {
         const res = await tripStationService.getAllTripStations();
-        setTripStations(res.data || []);
+        console.log('Trip stations loaded:', res.data?.length || 0);
       } catch (e) {
         console.error('Error fetching trip stations for trip station creation:', e);
       }
