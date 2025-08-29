@@ -1,12 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { customerService } from '../../services/api';
-import { Customer } from '../../types/company';
+import { Customer, CustomerWithTickets, CustomerDetail } from '../../types/company';
+import { useAuth } from '../../context/AuthContext';
+import RoleAccessNotice from '../../components/common/RoleAccessNotice';
 
 const CustomerList: React.FC = () => {
-  const [customers, setCustomers] = useState<Customer[]>([]);
+  const { isCompanyRestricted, getUserCompanyId } = useAuth();
+  const [customers, setCustomers] = useState<(Customer & { numericId?: number })[]>([]);
+  const [companyCustomers, setCompanyCustomers] = useState<CustomerWithTickets[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
+  
+  // Modal states for customer detail
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [selectedCustomerDetail, setSelectedCustomerDetail] = useState<CustomerDetail | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
 
   useEffect(() => {
     fetchCustomers();
@@ -18,10 +27,39 @@ const CustomerList: React.FC = () => {
       setError(null);
       console.log('Fetching customers...');
       
-      const response = await customerService.getAllCustomers();
-      console.log('Customers response:', response);
-      
-      setCustomers(response || []);
+      // Check if user is company-restricted (not admin)
+      if (isCompanyRestricted()) {
+        const userCompanyId = getUserCompanyId();
+        if (userCompanyId) {
+          console.log(`Fetching customers for company ${userCompanyId}...`);
+          const response = await customerService.getCustomersByCompany(userCompanyId);
+          console.log('Company customers response:', response);
+          
+          // Convert CustomerWithTickets to Customer format for display, but preserve the numeric ID
+          const convertedCustomers: (Customer & { numericId?: number })[] = response.map(customer => ({
+            customerId: customer.customerId,
+            customerName: customer.fullName,
+            customerEmail: customer.gmail,
+            customerPhone: customer.phone,
+            ticketId: customer.numberOfTickets > 0 ? `${customer.numberOfTickets} vé` : null,
+            ticketStatus: customer.numberOfTickets > 0 ? 4 : null, // Assume paid if has tickets
+            numericId: customer.id // Preserve the numeric ID for API calls
+          }));
+          
+          setCompanyCustomers(response);
+          setCustomers(convertedCustomers);
+        } else {
+          throw new Error('Không tìm thấy thông tin công ty của người dùng');
+        }
+      } else {
+        // Admin can see all customers
+        console.log('Fetching all customers (admin)...');
+        const response = await customerService.getAllCustomers();
+        console.log('All customers response:', response);
+        
+        setCustomers(response || []);
+        setCompanyCustomers([]);
+      }
     } catch (err: any) {
       console.error('Error details:', err);
       let errorMessage = 'Không thể tải danh sách khách hàng. ';
@@ -41,10 +79,55 @@ const CustomerList: React.FC = () => {
   };
 
   const filteredCustomers = customers.filter(customer =>
-    customer.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    customer.customerEmail.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    customer.customerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    customer.customerEmail?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (customer.customerPhone && customer.customerPhone.includes(searchTerm))
   );
+
+  // Handle viewing customer detail
+  const handleViewCustomer = async (customer: (Customer & { numericId?: number }) | CustomerWithTickets) => {
+    try {
+      setLoadingDetail(true);
+      console.log('Customer data passed to handleViewCustomer:', customer);
+      
+      // For customer data, we need to use a valid numeric ID
+      let numericId: number;
+      
+      if ('id' in customer && customer.id) {
+        // If there's an 'id' field, use it (for CustomerWithTickets)
+        numericId = customer.id;
+        console.log('Using id field:', numericId);
+      } else if ('numericId' in customer && customer.numericId) {
+        // If there's a 'numericId' field, use it (for extended Customer)
+        numericId = customer.numericId;
+        console.log('Using numericId field:', numericId);
+      } else {
+        // Try to parse customerId as number (fallback)
+        const parsedId = parseInt(customer.customerId);
+        if (isNaN(parsedId)) {
+          throw new Error('Invalid customer ID format');
+        }
+        numericId = parsedId;
+        console.log('Using parsed customerId:', numericId);
+      }
+      
+      console.log('Final numeric ID for API call:', numericId);
+      const customerDetail = await customerService.getCustomerById(numericId);
+      setSelectedCustomerDetail(customerDetail);
+      setIsDetailModalOpen(true);
+    } catch (error) {
+      console.error('Error fetching customer detail:', error);
+      setError('Failed to load customer detail');
+    } finally {
+      setLoadingDetail(false);
+    }
+  };
+
+  // Close detail modal
+  const closeDetailModal = () => {
+    setIsDetailModalOpen(false);
+    setSelectedCustomerDetail(null);
+  };
 
   const getStatusBadge = (ticketStatus: number | null) => {
     if (ticketStatus === null) {
@@ -79,11 +162,26 @@ const CustomerList: React.FC = () => {
 
   // Tính toán thống kê
   const getStatistics = () => {
-    const totalCustomers = customers.length;
-    const customersWithTickets = customers.filter(customer => customer.ticketId !== null).length;
-    const customersWithPaidTickets = customers.filter(customer => customer.ticketStatus === 4).length;
+    if (isCompanyRestricted()) {
+      // For company-specific view
+      const totalCustomers = companyCustomers.length;
+      const totalTickets = companyCustomers.reduce((sum, customer) => sum + customer.numberOfTickets, 0);
+      const customersWithTickets = companyCustomers.filter(customer => customer.numberOfTickets > 0).length;
 
-    return { totalCustomers, customersWithTickets, customersWithPaidTickets };
+      return { 
+        totalCustomers, 
+        customersWithTickets, 
+        customersWithPaidTickets: customersWithTickets, // Assume all tickets are paid
+        totalTickets 
+      };
+    } else {
+      // For admin view (original logic)
+      const totalCustomers = customers.length;
+      const customersWithTickets = customers.filter(customer => customer.ticketId !== null).length;
+      const customersWithPaidTickets = customers.filter(customer => customer.ticketStatus === 4).length;
+
+      return { totalCustomers, customersWithTickets, customersWithPaidTickets, totalTickets: 0 };
+    }
   };
 
   if (loading) {
@@ -106,8 +204,18 @@ const CustomerList: React.FC = () => {
           <details className="text-left text-sm text-gray-600 dark:text-gray-400 mb-4">
             <summary className="cursor-pointer">Chi tiết lỗi</summary>
             <div className="mt-2 p-2 bg-gray-100 dark:bg-gray-800 rounded">
-              <p>Endpoint: https://bobts-server-e7dxfwh7e5g9e3ad.malaysiawest-01.azurewebsites.net/api/Customers/GetAllCustomers</p>
-              <p>Parameters: All=true</p>
+              {isCompanyRestricted() ? (
+                <>
+                  <p>Endpoint: https://bobts-server-e7dxfwh7e5g9e3ad.malaysiawest-01.azurewebsites.net/api/Customers/company/{getUserCompanyId()}/with-tickets</p>
+                  <p>Role: Company-restricted user (Manager/Staff/Driver/Seller)</p>
+                </>
+              ) : (
+                <>
+                  <p>Endpoint: https://bobts-server-e7dxfwh7e5g9e3ad.malaysiawest-01.azurewebsites.net/api/Customers/GetAllCustomers</p>
+                  <p>Parameters: All=true</p>
+                  <p>Role: Admin (can see all customers)</p>
+                </>
+              )}
             </div>
           </details>
           <button 
@@ -125,12 +233,17 @@ const CustomerList: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Role-based access notice */}
+      <RoleAccessNotice className="mb-6" />
+
       {/* Statistics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Tổng khách hàng</p>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                {isCompanyRestricted() ? 'Khách hàng công ty' : 'Tổng khách hàng'}
+              </p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.totalCustomers}</p>
             </div>
             <div className="p-3 bg-blue-100 rounded-full dark:bg-blue-900/20">
@@ -144,7 +257,9 @@ const CustomerList: React.FC = () => {
         <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Có vé</p>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                {isCompanyRestricted() ? 'Khách có vé' : 'Có vé'}
+              </p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.customersWithTickets}</p>
             </div>
             <div className="p-3 bg-green-100 rounded-full dark:bg-green-900/20">
@@ -158,8 +273,12 @@ const CustomerList: React.FC = () => {
         <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Đã thanh toán</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.customersWithPaidTickets}</p>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                {isCompanyRestricted() ? 'Tổng số vé' : 'Đã thanh toán'}
+              </p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                {isCompanyRestricted() ? stats.totalTickets : stats.customersWithPaidTickets}
+              </p>
             </div>
             <div className="p-3 bg-pink-100 rounded-full dark:bg-pink-900/20">
               <svg className="w-6 h-6 text-pink-600 dark:text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -175,10 +294,18 @@ const CustomerList: React.FC = () => {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Danh sách khách hàng
+              {isCompanyRestricted() ? 'Khách hàng công ty' : 'Danh sách tất cả khách hàng'}
             </h3>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              Tổng số: {customers.length} khách hàng
+              {isCompanyRestricted() ? (
+                <>
+                  Tổng số: {customers.length} khách hàng • Tổng vé đã bán: {stats.totalTickets}
+                </>
+              ) : (
+                <>
+                  Tổng số: {customers.length} khách hàng (toàn hệ thống)
+                </>
+              )}
             </p>
           </div>
           <div className="flex gap-2">
@@ -215,7 +342,7 @@ const CustomerList: React.FC = () => {
                   Liên hệ
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">
-                  Vé xe
+                  {isCompanyRestricted() ? 'Số vé đã mua' : 'Vé xe'}
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">
                   Trạng thái
@@ -262,18 +389,26 @@ const CustomerList: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900 dark:text-white">
-                        {customer.ticketId || 'Chưa có vé'}
+                        {isCompanyRestricted() ? (
+                          // Show number of tickets for company users
+                          companyCustomers.find(c => c.customerId === customer.customerId)?.numberOfTickets || 0
+                        ) : (
+                          // Show ticket ID for admin
+                          customer.ticketId || 'Chưa có vé'
+                        )}
+                        {isCompanyRestricted() && ' vé'}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {getStatusBadge(customer.ticketStatus)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <button className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 mr-3">
-                        Xem
-                      </button>
-                      <button className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300">
-                        Sửa
+                      <button 
+                        className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300"
+                        onClick={() => handleViewCustomer(customer)}
+                        disabled={loadingDetail}
+                      >
+                        {loadingDetail ? 'Đang tải...' : 'Xem'}
                       </button>
                     </td>
                   </tr>
@@ -289,6 +424,81 @@ const CustomerList: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Customer Detail Modal */}
+      {isDetailModalOpen && selectedCustomerDetail && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 dark:bg-gray-900 dark:bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white dark:bg-gray-800">
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-t-md p-6 -m-5 mb-5">
+              <div className="flex items-center justify-between">
+                <h3 className="text-2xl font-bold text-white">
+                  Chi tiết khách hàng
+                </h3>
+                <button
+                  onClick={closeDetailModal}
+                  className="text-white hover:text-gray-200 transition-colors duration-200"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Họ và tên
+                  </label>
+                  <p className="text-gray-900 dark:text-white font-semibold">
+                    {selectedCustomerDetail.fullName}
+                  </p>
+                </div>
+                
+                <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Email
+                  </label>
+                  <p className="text-gray-900 dark:text-white">
+                    {selectedCustomerDetail.gmail}
+                  </p>
+                </div>
+                
+                <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Số điện thoại
+                  </label>
+                  <p className="text-gray-900 dark:text-white">
+                    {selectedCustomerDetail.phone}
+                  </p>
+                </div>
+
+                <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Mã khách hàng
+                  </label>
+                  <p className="text-gray-900 dark:text-white">
+                    #{selectedCustomerDetail.customerId}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex justify-end mt-6 pt-4 border-t border-gray-200 dark:border-gray-600">
+              <button
+                onClick={closeDetailModal}
+                className="px-6 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors duration-200"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

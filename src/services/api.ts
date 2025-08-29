@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { CompanyResponse, RouteResponse, CreateRouteRequest, UpdateRouteRequest, Customer, StationResponse, CreateStationRequest, UpdateStationRequest, Station, RoleResponse, CreateRoleRequest, UpdateRoleRequest, Role, BusResponse, LocationResponse, Company, TripResponse, CreateTripRequest, CreateCompanyRequest, Ticket, CompanySettlement, AdminRevenueSummary, CreateTypeBusWithDiagramRequest, CreateTypeBusWithDiagramResponse, BusTypeResponse, CreateBusRequest, TripStation, TripStationInfo, CreateTripStationRequest, ChargeRateResponse, TripSearchByCompanyResponse, SeatAvailability, CounterReservationRequest, CounterReservationResponse } from '../types/company';
+import { CompanyResponse, RouteResponse, CreateRouteRequest, UpdateRouteRequest, Customer, CustomerWithTickets, CustomerDetail, StationResponse, CreateStationRequest, UpdateStationRequest, Station, RoleResponse, CreateRoleRequest, UpdateRoleRequest, Role, BusResponse, LocationResponse, Company, TripResponse, CreateTripRequest, CreateCompanyRequest, Ticket, CompanySettlement, AdminRevenueSummary, CreateTypeBusWithDiagramRequest, CreateTypeBusWithDiagramResponse, BusType, BusTypeResponse, CreateBusRequest, UpdateBusRequest, BusDetail, TripStation, TripStationInfo, CreateTripStationRequest, ChargeRateResponse, TripSearchByCompanyResponse, SeatAvailability, CounterReservationRequest, CounterReservationResponse } from '../types/company';
 
 const baseURL = 'https://bobts-server-e7dxfwh7e5g9e3ad.malaysiawest-01.azurewebsites.net';
 
@@ -244,6 +244,26 @@ export const customerService = {
       throw error;
     }
   },
+
+  async getCustomersByCompany(companyId: number): Promise<CustomerWithTickets[]> {
+    try {
+      const response = await api.get<CustomerWithTickets[]>(`/api/Customers/company/${companyId}/with-tickets`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching customers by company:', error);
+      throw error;
+    }
+  },
+
+  async getCustomerById(id: number): Promise<CustomerDetail> {
+    try {
+      const response = await api.get<CustomerDetail>(`/api/Customers/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching customer by id:', error);
+      throw error;
+    }
+  },
 };
 
 export const stationService = {
@@ -369,9 +389,9 @@ export const busService = {
     }
   },
 
-  async getBusById(id: number): Promise<any> {
+  async getBusById(id: number): Promise<BusDetail> {
     try {
-      const response = await api.get(`/api/Bus/${id}`);
+      const response = await api.get<BusDetail>(`/api/Bus/${id}`);
       return response.data;
     } catch (error) {
       console.error('Error fetching bus by id:', error);
@@ -389,7 +409,7 @@ export const busService = {
     }
   },
 
-  async updateBus(id: number, busData: CreateBusRequest): Promise<any> {
+  async updateBus(id: number, busData: UpdateBusRequest): Promise<any> {
     try {
       const response = await api.put(`/api/Bus/${id}`, busData);
       return response.data;
@@ -660,17 +680,8 @@ export const ticketService = {
   },
   async getTicketsBySystemUser(systemUserId: number): Promise<Ticket[]> {
     try {
-      const response = await api.get<any>(`/api/Ticket/by-user/${systemUserId}`);
-      const payload = response.data;
-      // Normalize various possible backend shapes to Ticket[]
-      if (Array.isArray(payload)) return payload as Ticket[];
-      if (payload && Array.isArray(payload.data)) return payload.data as Ticket[];
-      if (payload && typeof payload === 'object') {
-        // Single ticket object case
-        if (payload.ticketId) return [payload as Ticket];
-      }
-      console.warn('getTicketsBySystemUser: Unexpected response shape, returning empty array', payload);
-      return [];
+      const response = await api.get<Ticket[]>(`/api/Ticket/by-user/${systemUserId}`);
+      return response.data;
     } catch (error) {
       console.error('Error fetching tickets by system user:', error);
       throw error;

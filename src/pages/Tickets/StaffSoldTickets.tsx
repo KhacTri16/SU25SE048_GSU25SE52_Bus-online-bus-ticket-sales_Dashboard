@@ -18,8 +18,8 @@ export default function StaffSoldTickets() {
       setLoading(true);
       setError(null);
       try {
-  const data = await ticketService.getTicketsBySystemUser(parseInt(user.id,10));
-  setTickets(Array.isArray(data) ? data : []);
+        const data = await ticketService.getTicketsBySystemUser(parseInt(user.id,10));
+        setTickets(data);
       } catch (e: any) {
         setError(e?.message || 'Không tải được vé đã bán tại quầy');
       } finally {
@@ -30,7 +30,6 @@ export default function StaffSoldTickets() {
   }, [isStaff, user]);
 
   const filtered = useMemo(() => {
-    if (!Array.isArray(tickets)) return [];
     return tickets.filter(t => {
       if (search) {
         const keyword = search.toLowerCase();

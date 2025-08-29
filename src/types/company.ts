@@ -99,6 +99,24 @@ export interface Customer {
   ticketStatus: number | null;
 }
 
+// New interface for customer with tickets (company-specific)
+export interface CustomerWithTickets {
+  id: number;
+  customerId: string;
+  fullName: string;
+  gmail: string;
+  phone: string;
+  numberOfTickets: number;
+}
+
+// Customer detail interface (from /api/Customers/{id})
+export interface CustomerDetail {
+  customerId: string;
+  fullName: string;
+  gmail: string;
+  phone: string;
+}
+
 export interface CustomerResponse {
   data: Customer[];
   page: number;
@@ -465,4 +483,29 @@ export interface CreateBusRequest {
   companyId: number;
   brand: string;
   amentity: string;
+}
+
+// Update Bus request
+export interface UpdateBusRequest {
+  name: string;
+  numberPlate: string;
+  brand: string;
+  amentity: string;
+  modelYear: string; // ISO date string
+  typeBusId: number;
+  companyId: number;
+}
+
+// Bus detail response (from getBusById)
+export interface BusDetail {
+  id: number;
+  busId: string;
+  name: string;
+  numberPlate: string;
+  brand: string;
+  amentity: string;
+  modelYear: string;
+  typeBusId: number;
+  companyName: string;
+  isDeleted: boolean;
 }

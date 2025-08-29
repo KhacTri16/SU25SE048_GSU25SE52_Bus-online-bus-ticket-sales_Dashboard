@@ -11,7 +11,9 @@ const SidebarWidget: React.FC = () => {
       case 1: return 'Admin';
       case 2: return 'Manager';
       case 3: return 'Staff';
-      default: return 'Unknown';
+      case 4: return 'Driver';
+      case 5: return 'Seller';
+      default: return 'User';
     }
   };
 
@@ -20,6 +22,8 @@ const SidebarWidget: React.FC = () => {
       case 1: return 'bg-red-500';
       case 2: return 'bg-blue-500';
       case 3: return 'bg-green-500';
+      case 4: return 'bg-yellow-500';
+      case 5: return 'bg-orange-500';
       default: return 'bg-gray-500';
     }
   };

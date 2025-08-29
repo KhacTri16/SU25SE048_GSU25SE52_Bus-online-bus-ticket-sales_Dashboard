@@ -23,15 +23,35 @@ export default function UserDropdown() {
     closeDropdown();
   };
 
-  // Role mapping helper
-  const ROLE_META: Record<number, { key: string; label: string; cls: string }> = {
-    1: { key: 'admin',   label: 'Admin',   cls: 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400' },
-    2: { key: 'manager', label: 'Manager', cls: 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400' },
-    3: { key: 'staff',   label: 'Staff',   cls: 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400' },
-    4: { key: 'driver',  label: 'Driver',  cls: 'bg-amber-100 text-amber-800 dark:bg-amber-900/20 dark:text-amber-400' },
-    5: { key: 'seller',  label: 'Seller',  cls: 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400' },
+  // Get role badge color
+  const getRoleBadgeColor = (roleId: number) => {
+    switch (roleId) {
+      case 1: // admin
+        return 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400';
+      case 2: // manager
+        return 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400';
+      case 3: // staff
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400';
+      case 4: // driver
+        return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400';
+      case 5: // seller
+        return 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400';
+      default:
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400';
+    }
   };
-  const roleMeta = ROLE_META[user?.roleId || 0] || { key: 'user', label: 'User', cls: 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400' };
+
+  // Get role name
+  const getRoleName = (roleId: number) => {
+    switch (roleId) {
+      case 1: return 'Admin';
+      case 2: return 'Manager';
+      case 3: return 'Staff';
+      case 4: return 'Driver';
+      case 5: return 'Seller';
+      default: return 'User';
+    }
+  };
 
   if (!user) return null;
 
@@ -49,8 +69,8 @@ export default function UserDropdown() {
           <span className="block font-medium text-theme-sm text-gray-800 dark:text-white">
             {user.fullName || 'User'}
           </span>
-          <span className={`inline-block px-2 py-0.5 text-xs font-medium rounded-full ${roleMeta.cls}`}>
-            {roleMeta.label}
+          <span className={`inline-block px-2 py-0.5 text-xs font-medium rounded-full ${getRoleBadgeColor(user.roleId)}`}>
+            {getRoleName(user.roleId)}
           </span>
         </div>
         
