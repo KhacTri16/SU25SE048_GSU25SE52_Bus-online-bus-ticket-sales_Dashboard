@@ -55,7 +55,14 @@ const CustomerList: React.FC = () => {
         // Admin can see all customers
         console.log('Fetching all customers (admin)...');
         const response = await customerService.getAllCustomers();
-        console.log('All customers response:', response);
+        console.log('Admin customers response:', response);
+        console.log('First admin customer structure:', response[0]);
+        
+        // Check if admin response has id fields
+        if (response.length > 0 && response[0]) {
+          console.log('Admin customer has id field?', 'id' in response[0], 'typeof id:', typeof response[0].id);
+          console.log('Admin customer customerId:', `"${response[0].customerId}"`);
+        }
         
         setCustomers(response || []);
         setCompanyCustomers([]);
@@ -90,31 +97,36 @@ const CustomerList: React.FC = () => {
       setLoadingDetail(true);
       console.log('Customer data passed to handleViewCustomer:', customer);
       
-      // For customer data, we need to use a valid numeric ID
-      let numericId: number;
-      
-      if ('id' in customer && customer.id) {
-        // If there's an 'id' field, use it (for CustomerWithTickets)
-        numericId = customer.id;
-        console.log('Using id field:', numericId);
-      } else if ('numericId' in customer && customer.numericId) {
-        // If there's a 'numericId' field, use it (for extended Customer)
-        numericId = customer.numericId;
-        console.log('Using numericId field:', numericId);
-      } else {
-        // Try to parse customerId as number (fallback)
-        const parsedId = parseInt(customer.customerId);
-        if (isNaN(parsedId)) {
-          throw new Error('Invalid customer ID format');
-        }
-        numericId = parsedId;
-        console.log('Using parsed customerId:', numericId);
+      // Priority 1: Use numeric id field if available (from both admin and company APIs)
+      if (customer.id && typeof customer.id === 'number' && customer.id > 0) {
+        console.log('Using numeric ID field:', customer.id);
+        const customerDetail = await customerService.getCustomerById(customer.id);
+        setSelectedCustomerDetail(customerDetail);
+        setIsDetailModalOpen(true);
       }
-      
-      console.log('Final numeric ID for API call:', numericId);
-      const customerDetail = await customerService.getCustomerById(numericId);
-      setSelectedCustomerDetail(customerDetail);
-      setIsDetailModalOpen(true);
+      // Priority 2: Use preserved numericId field (from converted company data)
+      else if ('numericId' in customer && customer.numericId && customer.numericId > 0) {
+        console.log('Using numericId field:', customer.numericId);
+        const customerDetail = await customerService.getCustomerById(customer.numericId);
+        setSelectedCustomerDetail(customerDetail);
+        setIsDetailModalOpen(true);
+      }
+      // Priority 3: For admin customers without numeric ID, create mock detail from available data
+      else if ('customerName' in customer && customer.customerName) {
+        console.log('Admin customer without numeric ID - using available data');
+        const mockDetail: CustomerDetail = {
+          customerId: customer.customerId?.trim() || 'N/A',
+          fullName: customer.customerName || 'N/A',
+          gmail: customer.customerEmail || 'N/A',
+          phone: customer.customerPhone || 'N/A'
+        };
+        setSelectedCustomerDetail(mockDetail);
+        setIsDetailModalOpen(true);
+      }
+      else {
+        console.error('No valid customer data found:', customer);
+        setError('Không thể hiển thị thông tin chi tiết khách hàng');
+      }
     } catch (error) {
       console.error('Error fetching customer detail:', error);
       setError('Failed to load customer detail');
@@ -360,8 +372,8 @@ const CustomerList: React.FC = () => {
                   </td>
                 </tr>
               ) : (
-                filteredCustomers.map((customer) => (
-                  <tr key={customer.customerId} className="hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                filteredCustomers.map((customer, index) => (
+                  <tr key={`customer-${customer.id || index}-${customer.customerEmail?.replace(/\s+/g, '') || customer.customerId?.replace(/\s+/g, '') || index}`} className="hover:bg-gray-50 dark:hover:bg-white/[0.02]">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="flex-shrink-0 h-12 w-12">

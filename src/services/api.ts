@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { CompanyResponse, RouteResponse, CreateRouteRequest, UpdateRouteRequest, Customer, CustomerWithTickets, CustomerDetail, StationResponse, CreateStationRequest, UpdateStationRequest, Station, RoleResponse, CreateRoleRequest, UpdateRoleRequest, Role, BusResponse, LocationResponse, Company, TripResponse, CreateTripRequest, CreateCompanyRequest, Ticket, CompanySettlement, AdminRevenueSummary, CreateTypeBusWithDiagramRequest, CreateTypeBusWithDiagramResponse, BusTypeResponse, CreateBusRequest, UpdateBusRequest, BusDetail, TripStation, TripStationInfo, CreateTripStationRequest, ChargeRateResponse, TripSearchByCompanyResponse, SeatAvailability, CounterReservationRequest, CounterReservationResponse } from '../types/company';
+import { CompanyResponse, RouteResponse, CreateRouteRequest, UpdateRouteRequest, Customer, CustomerWithTickets, CustomerDetail, StationResponse, CreateStationRequest, UpdateStationRequest, Station, RoleResponse, CreateRoleRequest, UpdateRoleRequest, Role, BusResponse, LocationResponse, Company, TripResponse, CreateTripRequest, CreateCompanyRequest, Ticket, CompanySettlement, AdminRevenueSummary, CreateTypeBusWithDiagramRequest, CreateTypeBusWithDiagramResponse, BusType, BusTypeResponse, CreateBusRequest, UpdateBusRequest, BusDetail, TripStation, TripStationInfo, CreateTripStationRequest, ChargeRateResponse, TripSearchByCompanyResponse, SeatAvailability, CounterReservationRequest, CounterReservationResponse } from '../types/company';
 
 const baseURL = 'https://bobts-server-e7dxfwh7e5g9e3ad.malaysiawest-01.azurewebsites.net';
 
@@ -75,7 +75,6 @@ export const companyService = {
   async createCompany(data: CreateCompanyRequest): Promise<Company> {
     try {
       const formData = new FormData();
-      // According to backend expects PascalCase keys
       if (data.companyId !== undefined) formData.append('CompanyId', data.companyId ?? '');
       if (data.name !== undefined) formData.append('Name', data.name ?? '');
       if (data.phone !== undefined) formData.append('Phone', data.phone ?? '');

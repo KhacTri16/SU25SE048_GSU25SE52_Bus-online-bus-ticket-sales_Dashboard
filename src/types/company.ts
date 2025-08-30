@@ -91,6 +91,7 @@ export interface UpdateRouteRequest {
 }
 
 export interface Customer {
+  id?: number; // Optional numeric ID for API detail calls
   customerId: string;
   customerName: string;
   customerEmail: string;
