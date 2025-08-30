@@ -6,11 +6,9 @@ import { ticketService, companyService } from "../../services/api";
 export default function BookingStatusChart() {
   const { isAdmin, isCompanyRestricted, getUserCompanyId } = useAuth();
   const [series, setSeries] = useState<number[]>([0, 0, 0]);
-  const [loading, setLoading] = useState<boolean>(false);
 
   useEffect(() => {
     const load = async () => {
-      setLoading(true);
       try {
         const tickets = await ticketService.getAllTickets();
         let filtered = tickets;
@@ -41,7 +39,7 @@ export default function BookingStatusChart() {
           Math.round((cancelled / total) * 100),
         ]);
       } finally {
-        setLoading(false);
+        // Empty finally block
       }
     };
     load();
