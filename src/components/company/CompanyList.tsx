@@ -640,7 +640,7 @@ export default function CompanyList() {
                         <option value={0}>Chọn tỷ lệ phí</option>
                         {chargeRates.map((rate) => (
                           <option key={rate.id} value={rate.id}>
-                            {rate.name} - {rate.rate}% (Hết hạn: {new Date(rate.endDate).toLocaleDateString('vi-VN')})
+                            {rate.rate}% (Hết hạn: {new Date(rate.endDate).toLocaleDateString('vi-VN')})
                           </option>
                         ))}
                       </select>

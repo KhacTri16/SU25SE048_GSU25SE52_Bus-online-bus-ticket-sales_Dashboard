@@ -832,6 +832,11 @@ export interface CompanyRevenueData {
   companyName: string;
   totalRevenue: number;
   monthlyRevenue: number[];
+  totalRefunded?: number;
+  systemFee?: number;
+  netRevenue?: number;
+  counterRevenue?: number;
+  onlineRevenue?: number;
 }
 
 export interface TotalRevenueResponse {
@@ -869,6 +874,25 @@ export const paymentService = {
     }
   },
 
+  // New API for getting company monthly revenue summary
+  async getCompanyMonthlyRevenueSummary(companyId: number, year: number, month: number): Promise<AdminRevenueSummary> {
+    try {
+      console.log(`Fetching monthly revenue summary for company ${companyId} for ${year}-${month}...`);
+      const response = await api.get<AdminRevenueSummary>(`/api/Payment/company/revenue/summary/monthly`, {
+        params: { 
+          companyId,
+          year,
+          month 
+        },
+      });
+      console.log(`Company ${companyId} monthly revenue summary for ${year}-${month}:`, response.data);
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching monthly revenue summary for company ${companyId}:`, error);
+      throw error;
+    }
+  },
+
   // New API for getting company monthly revenue
   async getCompanyMonthlyRevenue(companyId: number, year: number): Promise<number[]> {
     try {
@@ -879,17 +903,9 @@ export const paymentService = {
       
       for (let month = 1; month <= 12; month++) {
         try {
-          const monthStr = month.toString().padStart(2, '0');
-          const response = await api.get<AdminRevenueSummary>(`/api/Payment/company/revenue/summary/monthly`, {
-            params: {
-              companyId: companyId,
-              year: year,
-              month: monthStr
-            }
-          });
-          
-          console.log(`Company ${companyId} month ${monthStr} revenue:`, response.data.totalRevenue);
-          monthlyData[month - 1] = response.data.totalRevenue;
+          const response = await this.getCompanyMonthlyRevenueSummary(companyId, year, month);
+          console.log(`Company ${companyId} month ${month} revenue:`, response.totalRevenue);
+          monthlyData[month - 1] = response.totalRevenue;
         } catch (error) {
           console.error(`Error fetching revenue for company ${companyId} month ${month}:`, error);
           monthlyData[month - 1] = 0;
@@ -1017,21 +1033,47 @@ export const paymentService = {
         };
       }
       
-      // Get revenue for each company using the individual endpoint
+      // Get revenue for each company using the new detailed endpoint
       const companiesRevenue: CompanyRevenueData[] = [];
       let calculatedTotalRevenue = 0;
       
-      console.log('Fetching revenue for each company...');
+      console.log('Fetching detailed revenue for each company...');
       for (const company of companies) {
-        const companyRevenue = await this.getCompanyTotalRevenue(company.id);
-        calculatedTotalRevenue += companyRevenue;
-        
-        companiesRevenue.push({
-          companyId: company.id,
-          companyName: company.name,
-          totalRevenue: companyRevenue,
-          monthlyRevenue: Array(12).fill(0) // Placeholder - would need monthly endpoint per company
-        });
+        try {
+          // Get total revenue summary for this company
+          const companyRevenueSummary = await this.getCompanyRevenueSummary(company.id);
+          calculatedTotalRevenue += companyRevenueSummary.totalRevenue;
+          
+          // Get monthly revenue for this company (for the current year)
+          const currentYear = new Date().getFullYear();
+          const monthlyRevenue = await this.getCompanyMonthlyRevenue(company.id, currentYear);
+          
+          companiesRevenue.push({
+            companyId: company.id,
+            companyName: company.name,
+            totalRevenue: companyRevenueSummary.totalRevenue,
+            totalRefunded: companyRevenueSummary.totalRefunded,
+            systemFee: companyRevenueSummary.systemFee,
+            netRevenue: companyRevenueSummary.netRevenue,
+            counterRevenue: companyRevenueSummary.counterRevenue || 0,
+            onlineRevenue: companyRevenueSummary.onlineRevenue || 0,
+            monthlyRevenue: monthlyRevenue
+          });
+        } catch (error) {
+          console.error(`Error fetching revenue for company ${company.id} (${company.name}):`, error);
+          // Add company with zero revenue if API fails
+          companiesRevenue.push({
+            companyId: company.id,
+            companyName: company.name,
+            totalRevenue: 0,
+            totalRefunded: 0,
+            systemFee: 0,
+            netRevenue: 0,
+            counterRevenue: 0,
+            onlineRevenue: 0,
+            monthlyRevenue: Array(12).fill(0)
+          });
+        }
       }
       
       console.log('Revenue calculation summary:', {

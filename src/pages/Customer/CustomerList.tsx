@@ -141,37 +141,6 @@ const CustomerList: React.FC = () => {
     setSelectedCustomerDetail(null);
   };
 
-  const getStatusBadge = (ticketStatus: number | null) => {
-    if (ticketStatus === null) {
-      return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400">
-          Chưa có vé
-        </span>
-      );
-    }
-    
-    switch (ticketStatus) {
-      case 0:
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400">
-            Đã đặt
-          </span>
-        );
-      case 4:
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400">
-            Đã thanh toán
-          </span>
-        );
-      default:
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400">
-            Trạng thái: {ticketStatus}
-          </span>
-        );
-    }
-  };
-
   // Tính toán thống kê
   const getStatistics = () => {
     if (isCompanyRestricted()) {
@@ -354,12 +323,6 @@ const CustomerList: React.FC = () => {
                   Liên hệ
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">
-                  {isCompanyRestricted() ? 'Số vé đã mua' : 'Vé xe'}
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">
-                  Trạng thái
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">
                   Hành động
                 </th>
               </tr>
@@ -367,7 +330,7 @@ const CustomerList: React.FC = () => {
             <tbody className="bg-white divide-y divide-gray-200 dark:bg-transparent dark:divide-gray-800">
               {filteredCustomers.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                  <td colSpan={3} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                     {searchTerm ? 'Không tìm thấy khách hàng nào phù hợp' : 'Chưa có khách hàng nào'}
                   </td>
                 </tr>
@@ -394,25 +357,10 @@ const CustomerList: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900 dark:text-white">{customer.customerEmail}</div>
-                      <div className="text-sm text-gray-500 dark:text-gray-400">
-                        {customer.customerPhone || 'Chưa có số điện thoại'}
+                      <div className="text-sm text-gray-900 dark:text-white mb-1">{customer.customerEmail}</div>
+                      <div className="text-sm font-medium text-blue-600 dark:text-blue-400">
+                        📞 {customer.customerPhone || 'Chưa có số điện thoại'}
                       </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900 dark:text-white">
-                        {isCompanyRestricted() ? (
-                          // Show number of tickets for company users
-                          companyCustomers.find(c => c.customerId === customer.customerId)?.numberOfTickets || 0
-                        ) : (
-                          // Show ticket ID for admin
-                          customer.ticketId || 'Chưa có vé'
-                        )}
-                        {isCompanyRestricted() && ' vé'}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {getStatusBadge(customer.ticketStatus)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <button 

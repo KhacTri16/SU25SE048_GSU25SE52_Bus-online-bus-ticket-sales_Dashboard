@@ -10,6 +10,7 @@ export default function RevenueReport() {
   const { getUserCompanyId, isAdmin } = authContext;
   const [year, setYear] = useState<number>(new Date().getFullYear());
   const [monthlyRevenue, setMonthlyRevenue] = useState<number[]>(Array(12).fill(0));
+  const [totalRevenue, setTotalRevenue] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [companyName, setCompanyName] = useState<string>("");
   
@@ -19,6 +20,8 @@ export default function RevenueReport() {
   const [systemTotalRefunded, setSystemTotalRefunded] = useState<number | null>(null);
   const [systemFee, setSystemFee] = useState<number | null>(null);
   const [systemNetRevenue, setSystemNetRevenue] = useState<number | null>(null);
+  const [systemCounterRevenue, setSystemCounterRevenue] = useState<number | null>(null);
+  const [systemOnlineRevenue, setSystemOnlineRevenue] = useState<number | null>(null);
   const [currentMonthDetail, setCurrentMonthDetail] = useState<AdminRevenueSummary | null>(null);
   const [loadingDetailedData, setLoadingDetailedData] = useState<boolean>(false);
   const [settlements, setSettlements] = useState<CompanySettlement[] | null>(null);
@@ -58,11 +61,15 @@ export default function RevenueReport() {
             setSystemTotalRefunded(simpleRevenueData.totalRefunded);
             setSystemFee(simpleRevenueData.systemFee);
             setSystemNetRevenue(simpleRevenueData.netRevenue);
+            setSystemCounterRevenue(simpleRevenueData.counterRevenue || 0);
+            setSystemOnlineRevenue(simpleRevenueData.onlineRevenue || 0);
             console.log('Admin revenue summary:', {
               totalRevenue: simpleRevenueData.totalRevenue,
               totalRefunded: simpleRevenueData.totalRefunded,
               systemFee: simpleRevenueData.systemFee,
-              netRevenue: simpleRevenueData.netRevenue
+              netRevenue: simpleRevenueData.netRevenue,
+              counterRevenue: simpleRevenueData.counterRevenue,
+              onlineRevenue: simpleRevenueData.onlineRevenue
             });
           } catch (error) {
             console.error('Error fetching simple revenue:', error);
@@ -129,6 +136,7 @@ export default function RevenueReport() {
            
            if (!companyId) {
              console.warn('No company ID found for user');
+             setTotalRevenue(0);
              setMonthlyRevenue(Array(12).fill(0));
              return;
            }
@@ -150,10 +158,12 @@ export default function RevenueReport() {
                console.log('Fetching company revenue summary...');
                const companyRevenueData = await paymentService.getCompanyRevenueSummary(companyId);
                setCompanyRevenueSummary(companyRevenueData);
+               setTotalRevenue(companyRevenueData.totalRevenue);
                console.log('Company revenue summary:', companyRevenueData);
              } catch (error) {
                console.error('Error fetching company revenue summary:', error);
                setCompanyRevenueSummary(null);
+               setTotalRevenue(0);
              }
 
                            // Fetch monthly revenue using new API
@@ -200,6 +210,7 @@ export default function RevenueReport() {
              }
            } catch (error) {
              console.error(`Error fetching revenue for company ${companyId}:`, error);
+             setTotalRevenue(0);
              setMonthlyRevenue(Array(12).fill(0));
              setSettlements([]);
              setCompanyRevenueSummary(null);
@@ -210,6 +221,7 @@ export default function RevenueReport() {
         setMonthlyRevenue(Array(12).fill(0));
         setAllCompaniesData([]);
         setSystemTotalRevenue(null);
+        setTotalRevenue(null);
         setSettlements([]);
       } finally {
         setIsLoading(false);
@@ -258,7 +270,7 @@ export default function RevenueReport() {
            height={380}
          />
 
-                 <div className={`grid ${isAdmin() ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-2 md:grid-cols-4'} gap-4 mt-6 pt-6 border-t border-gray-200 dark:border-gray-800`}>
+                 <div className={`grid ${isAdmin() ? 'grid-cols-2 md:grid-cols-6' : 'grid-cols-2 md:grid-cols-4'} gap-4 mt-6 pt-6 border-t border-gray-200 dark:border-gray-800`}>
            <div className="text-center">
              <p className="text-2xl font-bold text-gray-900 dark:text-white">
                {isAdmin() 
@@ -309,6 +321,26 @@ export default function RevenueReport() {
                </p>
              </div>
            )}
+           {isAdmin() && (
+             <div className="text-center">
+               <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                 {systemCounterRevenue === null ? (isLoading ? '...' : '0') : new Intl.NumberFormat('vi-VN').format(systemCounterRevenue)}
+               </p>
+               <p className="text-sm text-gray-500 dark:text-gray-400">
+                 Doanh thu quầy
+               </p>
+             </div>
+           )}
+           {isAdmin() && (
+             <div className="text-center">
+               <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
+                 {systemOnlineRevenue === null ? (isLoading ? '...' : '0') : new Intl.NumberFormat('vi-VN').format(systemOnlineRevenue)}
+               </p>
+               <p className="text-sm text-gray-500 dark:text-gray-400">
+                 Doanh thu online
+               </p>
+             </div>
+           )}
          </div>
              </div>
 
@@ -322,7 +354,7 @@ export default function RevenueReport() {
              </p>
            </div>
            
-           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+           <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
              <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
                <div className="text-2xl font-bold text-green-600 dark:text-green-400 mb-1">
                  {new Intl.NumberFormat('vi-VN').format(currentMonthDetail.totalRevenue)}
@@ -350,6 +382,20 @@ export default function RevenueReport() {
                </div>
                <p className="text-sm text-gray-600 dark:text-gray-400">Doanh thu ròng</p>
              </div>
+             
+             <div className="text-center p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg">
+               <div className="text-2xl font-bold text-indigo-600 dark:text-indigo-400 mb-1">
+                 {new Intl.NumberFormat('vi-VN').format(currentMonthDetail.onlineRevenue || 0)}
+               </div>
+               <p className="text-sm text-gray-600 dark:text-gray-400">Doanh thu online</p>
+             </div>
+             
+             <div className="text-center p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
+               <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400 mb-1">
+                 {new Intl.NumberFormat('vi-VN').format(currentMonthDetail.counterRevenue || 0)}
+               </div>
+               <p className="text-sm text-gray-600 dark:text-gray-400">Doanh thu quầy</p>
+             </div>
            </div>
          </div>
        )}
@@ -362,7 +408,7 @@ export default function RevenueReport() {
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Tổng doanh thu của tất cả công ty</p>
           </div>
           
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
             <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
               <div className="text-2xl font-bold text-green-600 dark:text-green-400 mb-1">
                 {new Intl.NumberFormat('vi-VN').format(systemTotalRevenue || 0)}
@@ -389,6 +435,20 @@ export default function RevenueReport() {
                 {new Intl.NumberFormat('vi-VN').format(systemNetRevenue || 0)}
               </div>
               <p className="text-sm text-gray-600 dark:text-gray-400">Doanh thu ròng</p>
+            </div>
+            
+            <div className="text-center p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg">
+              <div className="text-2xl font-bold text-indigo-600 dark:text-indigo-400 mb-1">
+                {new Intl.NumberFormat('vi-VN').format(systemOnlineRevenue || 0)}
+              </div>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Doanh thu online</p>
+            </div>
+            
+            <div className="text-center p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
+              <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400 mb-1">
+                {new Intl.NumberFormat('vi-VN').format(systemCounterRevenue || 0)}
+              </div>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Doanh thu quầy</p>
             </div>
           </div>
           
@@ -510,7 +570,7 @@ export default function RevenueReport() {
              </div>
              
              {/* Detailed revenue breakdown */}
-             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 pt-4 border-t border-pink-200 dark:border-pink-800">
+             <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mt-4 pt-4 border-t border-pink-200 dark:border-pink-800">
                <div className="text-center">
                  <div className="text-lg font-semibold text-green-600 dark:text-green-400">
                    {new Intl.NumberFormat('vi-VN').format(companyRevenueSummary.totalRevenue)}
@@ -534,6 +594,18 @@ export default function RevenueReport() {
                    {new Intl.NumberFormat('vi-VN').format(companyRevenueSummary.netRevenue)}
                  </div>
                  <p className="text-xs text-gray-600 dark:text-gray-400">Doanh thu ròng</p>
+               </div>
+               <div className="text-center">
+                 <div className="text-lg font-semibold text-indigo-600 dark:text-indigo-400">
+                   {new Intl.NumberFormat('vi-VN').format(companyRevenueSummary.onlineRevenue || 0)}
+                 </div>
+                 <p className="text-xs text-gray-600 dark:text-gray-400">Doanh thu online</p>
+               </div>
+               <div className="text-center">
+                 <div className="text-lg font-semibold text-yellow-600 dark:text-yellow-400">
+                   {new Intl.NumberFormat('vi-VN').format(companyRevenueSummary.counterRevenue || 0)}
+                 </div>
+                 <p className="text-xs text-gray-600 dark:text-gray-400">Doanh thu quầy</p>
                </div>
              </div>
            </div>
@@ -559,6 +631,18 @@ export default function RevenueReport() {
                     Tổng doanh thu
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">
+                    Doanh thu online
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">
+                    Doanh thu quầy
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">
+                    Phí hệ thống
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">
+                    Doanh thu ròng
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">
                     Doanh thu tháng này
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400">
@@ -569,7 +653,7 @@ export default function RevenueReport() {
               <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
                 {loadingDetailedData ? (
                   <tr>
-                    <td colSpan={4} className="px-6 py-8 text-center">
+                    <td colSpan={8} className="px-6 py-8 text-center">
                       <div className="flex items-center justify-center">
                         <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-pink-600 mr-3"></div>
                         <span className="text-gray-500 dark:text-gray-400">Đang tải dữ liệu công ty...</span>
@@ -578,7 +662,7 @@ export default function RevenueReport() {
                   </tr>
                 ) : allCompaniesData.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="px-6 py-8 text-center">
+                    <td colSpan={8} className="px-6 py-8 text-center">
                       <div className="text-gray-500 dark:text-gray-400">
                         <div className="text-lg mb-2">📊</div>
                         <div>Không có dữ liệu công ty</div>
@@ -615,6 +699,26 @@ export default function RevenueReport() {
                         <td className="px-6 py-4 whitespace-nowrap text-right">
                           <div className="text-sm font-semibold text-gray-900 dark:text-white">
                             {new Intl.NumberFormat('vi-VN').format(company.totalRevenue)} VND
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                          <div className="text-sm text-blue-600 dark:text-blue-400">
+                            {new Intl.NumberFormat('vi-VN').format(company.onlineRevenue || 0)} VND
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                          <div className="text-sm text-green-600 dark:text-green-400">
+                            {new Intl.NumberFormat('vi-VN').format(company.counterRevenue || 0)} VND
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                          <div className="text-sm text-orange-600 dark:text-orange-400">
+                            {new Intl.NumberFormat('vi-VN').format(company.systemFee || 0)} VND
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                          <div className="text-sm font-semibold text-purple-600 dark:text-purple-400">
+                            {new Intl.NumberFormat('vi-VN').format(company.netRevenue || 0)} VND
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right">

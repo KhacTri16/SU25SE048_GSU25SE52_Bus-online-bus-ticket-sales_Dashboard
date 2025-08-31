@@ -404,6 +404,8 @@ export interface AdminRevenueSummary {
   totalRefunded: number;
   systemFee: number;
   netRevenue: number;
+  counterRevenue?: number;
+  onlineRevenue?: number;
 }
 
 // TypeBus + Diagram

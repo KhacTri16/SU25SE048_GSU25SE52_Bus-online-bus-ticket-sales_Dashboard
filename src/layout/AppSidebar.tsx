@@ -10,7 +10,6 @@ import {
   HorizontaLDots,
   // ...existing code...
   PieChartIcon,
-  PlugInIcon,
   TableIcon,
   UserCircleIcon,
   GroupIcon,
@@ -79,16 +78,6 @@ const othersItems: NavItem[] = [
     name: "Cài đặt",
     subItems: [
       { name: "Quản lý người dùng", path: "/users", pro: false },
-    ],
-  },
-
-  {
-    icon: <PlugInIcon />,
-    name: "Tài khoản",
-    subItems: [
-      { name: "Thông tin cá nhân", path: "/profile", pro: false },
-      { name: "Đổi mật khẩu", path: "/change-password", pro: false },
-      { name: "Đăng xuất", path: "/logout", pro: false },
     ],
   },
 ];
