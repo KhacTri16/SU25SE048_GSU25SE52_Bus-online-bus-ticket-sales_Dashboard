@@ -4,7 +4,7 @@ import { useAuth } from "../../context/AuthContext";
 import { ticketService, companyService, paymentService } from "../../services/api";
 
 export default function RevenueChart() {
-  const { getUserCompanyId, isAdmin, isCompanyRestricted } = useAuth();
+  const { getUserCompanyId, isAdmin } = useAuth();
   const [year, setYear] = useState<number>(new Date().getFullYear());
   const [monthlyRevenue, setMonthlyRevenue] = useState<number[]>(Array(12).fill(0));
   const [totalRevenue, setTotalRevenue] = useState<number | null>(null);
