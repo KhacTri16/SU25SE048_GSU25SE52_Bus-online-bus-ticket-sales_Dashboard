@@ -31,7 +31,7 @@ export default function RecentBookings() {
           date: new Date(t.timeStart).toLocaleDateString('vi-VN'),
           seatNumber: t.seatId,
           price: new Intl.NumberFormat('vi-VN').format(t.price),
-          status: t.status === 0 || t.status === 5 ? "confirmed" : t.status === 2 ? "cancelled" : "pending",
+          status: (t.status === 0 || t.status === 5 ? "confirmed" : t.status === 2 ? "cancelled" : "pending") as "confirmed" | "pending" | "cancelled",
         }));
         setBookings(latest);
       } catch (e) {
