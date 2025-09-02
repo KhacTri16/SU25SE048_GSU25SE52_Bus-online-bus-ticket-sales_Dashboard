@@ -69,10 +69,12 @@ export default function StaffSoldTickets() {
             <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Trạng thái</label>
             <select value={statusFilter} onChange={e=>setStatusFilter(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm">
               <option value="">Tất cả</option>
-              <option value="0">Mới</option>
-              <option value="1">Đã CheckIn</option>
-              <option value="2">Hoàn thành</option>
-              <option value="3">Đã hủy</option>
+              <option value="0">Đã thanh toán</option>
+              <option value="1">Đã điểm danh</option>
+              <option value="2">Đã hoàn tiền</option>
+              <option value="3">Chờ thanh toán</option>
+              <option value="4">Thất bại</option>
+              <option value="5">Hoàn thành</option>
             </select>
           </div>
         </div>
@@ -140,10 +142,12 @@ function Td({ children, className = '' }: { children: React.ReactNode; className
 
 function StatusBadge({ status }: { status: number }) {
   const map: Record<number, { label: string; cls: string }> = {
-    0: { label: 'Mới', cls: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' },
-    1: { label: 'CheckIn', cls: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' },
-    2: { label: 'Hoàn thành', cls: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
-    3: { label: 'Hủy', cls: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' },
+    0: { label: 'Đã thanh toán', cls: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' },
+    1: { label: 'Đã điểm danh', cls: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400' },
+    2: { label: 'Đã hoàn tiền', cls: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' },
+    3: { label: 'Chờ thanh toán', cls: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' },
+    4: { label: 'Thất bại', cls: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' },
+    5: { label: 'Hoàn thành', cls: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
   };
   const s = map[status] || { label: 'Khác', cls: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400' };
   return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${s.cls}`}>{s.label}</span>;

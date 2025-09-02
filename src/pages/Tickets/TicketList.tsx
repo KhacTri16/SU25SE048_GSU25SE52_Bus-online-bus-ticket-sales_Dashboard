@@ -68,7 +68,7 @@ export default function TicketList() {
     const statusConfig = {
       0: { label: 'Đã thanh toán', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400' },
       1: { label: 'Đã điểm danh', color: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/20 dark:text-indigo-400' },
-      2: { label: 'Đã Hoàn tiền', color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400' },
+      2: { label: 'Đã hoàn tiền', color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400' },
       3: { label: 'Chờ thanh toán', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400' },
       4: { label: 'Thất bại', color: 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400' },
       5: { label: 'Hoàn thành', color: 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400' },
@@ -102,13 +102,13 @@ export default function TicketList() {
 
   const getTicketStats = () => {
     const total = filteredTickets.length;
-    const confirmed = filteredTickets.filter(t => t.status === 1).length;
-    const completed = filteredTickets.filter(t => t.status === 3).length;
-    const cancelled = filteredTickets.filter(t => t.status === 4).length;
-    // Revenue should include only paid or finished tickets (0: Đã thanh toán, 5: Hoàn thành)
+    const checkedIn = filteredTickets.filter(t => t.status === 1).length; // Đã điểm danh
+    const completed = filteredTickets.filter(t => t.status === 5).length; // Hoàn thành
+    const failed = filteredTickets.filter(t => t.status === 4).length; // Thất bại
+    // Revenue should include only paid or completed tickets (0: Đã thanh toán, 5: Hoàn thành)
     const totalRevenue = filteredTickets.reduce((sum, t) => (t.status === 0 || t.status === 5) ? sum + t.price : sum, 0);
 
-    return { total, confirmed, completed, cancelled, totalRevenue };
+    return { total, checkedIn, completed, failed, totalRevenue };
   };
 
   const stats = getTicketStats();
@@ -226,8 +226,8 @@ export default function TicketList() {
               </svg>
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Đã xác nhận</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.confirmed}</p>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Đã điểm danh</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.checkedIn}</p>
             </div>
           </div>
         </div>
@@ -254,8 +254,8 @@ export default function TicketList() {
               </svg>
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Đã hủy</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.cancelled}</p>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Thất bại</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.failed}</p>
             </div>
           </div>
         </div>
@@ -308,12 +308,12 @@ export default function TicketList() {
               className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-pink-500 focus:border-pink-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:focus:ring-pink-500 dark:focus:border-pink-500"
             >
               <option value="all">Tất cả</option>
-              <option value="0">Chờ xác nhận</option>
-              <option value="1">Đã xác nhận</option>
-              <option value="2">Đang di chuyển</option>
-              <option value="3">Hoàn thành</option>
-              <option value="4">Đã hủy</option>
-              <option value="5">Hoàn tiền</option>
+              <option value="0">Đã thanh toán</option>
+              <option value="1">Đã điểm danh</option>
+              <option value="2">Đã hoàn tiền</option>
+              <option value="3">Chờ thanh toán</option>
+              <option value="4">Thất bại</option>
+              <option value="5">Hoàn thành</option>
             </select>
           </div>
         </div>

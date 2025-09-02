@@ -102,18 +102,6 @@ export default function RoutesManagement() {
     })();
   }, []);
 
-  // Remove unused trip stations fetch
-  // useEffect(() => {
-  //   (async () => {
-  //     try {
-  //       const res = await tripStationService.getAllTripStations();
-  //       setTripStations(res.data || []);
-  //     } catch (e) {
-  //       console.error('Error fetching trip stations for trip station creation:', e);
-  //     }
-  //   })();
-  // }, []);
-
   const fetchRoutes = async () => {
     try {
       setLoading(true);
@@ -392,7 +380,7 @@ export default function RoutesManagement() {
       tripId: trip.id,
       stationId: 0,
       price: 0,
-      pickUpTime: new Date().toISOString(),
+      pickUpTime: trip.timeStart, // Set to trip's start time instead of current time
       description: ''
     });
     setIsTripStationModalOpen(true);
@@ -417,6 +405,35 @@ export default function RoutesManagement() {
 
   const handleCreateTripStation = async () => {
     if (!newTripStation || !creatingStationForTrip) return;
+    
+    // Validation - kiểm tra các trường bắt buộc
+    if (!newTripStation.tripStationId || !newTripStation.stationId || newTripStation.price <= 0) {
+      showMessage('Vui lòng điền đầy đủ thông tin và giá phải lớn hơn 0.', 'error');
+      return;
+    }
+
+    // Validation - kiểm tra thời gian đón phải nằm trong khoảng thời gian của chuyến
+    const pickUpLocal = formatDateTimeLocal(newTripStation.pickUpTime);
+    const startLocal = formatDateTimeLocal(creatingStationForTrip.timeStart);
+    const endLocal = formatDateTimeLocal(creatingStationForTrip.timeEnd);
+    
+    console.log('Validation Debug:', {
+      pickUpTime: newTripStation.pickUpTime,
+      tripTimeStart: creatingStationForTrip.timeStart,
+      tripTimeEnd: creatingStationForTrip.timeEnd,
+      pickUpLocal,
+      startLocal,
+      endLocal,
+      isValid: pickUpLocal >= startLocal && pickUpLocal <= endLocal
+    });
+    
+    if (pickUpLocal < startLocal || pickUpLocal > endLocal) {
+      showMessage(
+        `Thời gian đón phải nằm giữa ${new Date(creatingStationForTrip.timeStart).toLocaleString('vi-VN')} và ${new Date(creatingStationForTrip.timeEnd).toLocaleString('vi-VN')}`, 
+        'error'
+      );
+      return;
+    }
     
     try {
       await tripStationService.createTripStation(newTripStation);
@@ -1174,9 +1191,27 @@ export default function RoutesManagement() {
                 <input
                   type="datetime-local"
                   value={formatDateTimeLocal(newTripStation.pickUpTime)}
+                  min={formatDateTimeLocal(creatingStationForTrip.timeStart)}
+                  max={formatDateTimeLocal(creatingStationForTrip.timeEnd)}
                   onChange={(e) => setNewTripStation({ ...newTripStation, pickUpTime: localDateTimeToISO(e.target.value) })}
                   className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                 />
+                {(() => {
+                  // Convert all times to local datetime strings for consistent comparison
+                  const pickUpLocal = formatDateTimeLocal(newTripStation.pickUpTime);
+                  const startLocal = formatDateTimeLocal(creatingStationForTrip.timeStart);
+                  const endLocal = formatDateTimeLocal(creatingStationForTrip.timeEnd);
+                  
+                  // Compare as local datetime strings (YYYY-MM-DDTHH:MM format)
+                  if (pickUpLocal < startLocal || pickUpLocal > endLocal) {
+                    return (
+                      <div className="text-xs text-red-500 mt-1">
+                        Thời gian đón phải nằm giữa {new Date(creatingStationForTrip.timeStart).toLocaleString('vi-VN')} và {new Date(creatingStationForTrip.timeEnd).toLocaleString('vi-VN')}
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Mô tả</label>
@@ -1195,11 +1230,23 @@ export default function RoutesManagement() {
               </button>
               <button
                 onClick={handleCreateTripStation}
-                disabled={!newTripStation.tripStationId || !newTripStation.stationId || newTripStation.price <= 0}
+                disabled={(() => {
+                  if (!newTripStation.tripStationId || !newTripStation.stationId || newTripStation.price <= 0) return true;
+                  // Use local datetime string comparison for consistency with HTML5 input constraints
+                  const pickUpLocal = formatDateTimeLocal(newTripStation.pickUpTime);
+                  const startLocal = formatDateTimeLocal(creatingStationForTrip.timeStart);
+                  const endLocal = formatDateTimeLocal(creatingStationForTrip.timeEnd);
+                  return pickUpLocal < startLocal || pickUpLocal > endLocal;
+                })()}
                 className={`px-4 py-2 text-sm font-medium text-white rounded-lg ${
-                  !newTripStation.tripStationId || !newTripStation.stationId || newTripStation.price <= 0
-                    ? 'bg-blue-600/50 cursor-not-allowed'
-                    : 'bg-blue-600 hover:bg-blue-700'
+                  (() => {
+                    if (!newTripStation.tripStationId || !newTripStation.stationId || newTripStation.price <= 0) return 'bg-blue-600/50 cursor-not-allowed';
+                    // Use local datetime string comparison for consistency
+                    const pickUpLocal = formatDateTimeLocal(newTripStation.pickUpTime);
+                    const startLocal = formatDateTimeLocal(creatingStationForTrip.timeStart);
+                    const endLocal = formatDateTimeLocal(creatingStationForTrip.timeEnd);
+                    return (pickUpLocal < startLocal || pickUpLocal > endLocal) ? 'bg-blue-600/50 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700';
+                  })()
                 }`}
               >
                 Tạo trạm
