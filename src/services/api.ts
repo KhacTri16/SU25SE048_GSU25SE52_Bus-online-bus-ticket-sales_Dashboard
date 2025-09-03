@@ -558,8 +558,6 @@ export const tripService = {
     }
   },
   async completeTrip(tripId: number): Promise<string> {
-    // Some environments may expose this action via different verb/path.
-    // We'll attempt a small cascade of likely endpoints/methods.
     const attempts: Array<{ method: 'post' | 'put'; url: string; body?: any; description: string }> = [
       { method: 'post', url: `/api/Trip/complete/${tripId}`, description: 'POST /api/Trip/complete/{id}' },
       { method: 'put', url: `/api/Trip/complete/${tripId}`, description: 'PUT /api/Trip/complete/{id}' },

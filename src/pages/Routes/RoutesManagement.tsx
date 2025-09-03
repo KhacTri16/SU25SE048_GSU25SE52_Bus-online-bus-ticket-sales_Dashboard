@@ -412,7 +412,6 @@ export default function RoutesManagement() {
       return;
     }
 
-    // Validation - kiểm tra thời gian đón phải nằm trong khoảng thời gian của chuyến
     const pickUpLocal = formatDateTimeLocal(newTripStation.pickUpTime);
     const startLocal = formatDateTimeLocal(creatingStationForTrip.timeStart);
     const endLocal = formatDateTimeLocal(creatingStationForTrip.timeEnd);

@@ -23,27 +23,16 @@ export default function RecentBookings() {
         const tickets = await ticketService.getAllTickets();
         // Sort by createDate desc and take latest 5
         tickets.sort((a, b) => new Date(b.createDate).getTime() - new Date(a.createDate).getTime());
-        const latest = tickets.slice(0, 5).map(t => {
-          let status: "confirmed" | "pending" | "cancelled";
-          if (t.status === 0 || t.status === 5) {
-            status = "confirmed";
-          } else if (t.status === 2) {
-            status = "cancelled";
-          } else {
-            status = "pending";
-          }
-          
-          return {
-            id: t.ticketId,
-            customerName: t.customerName,
-            route: `${t.fromTripStation} - ${t.toTripStation}`,
-            departureTime: new Date(t.timeStart).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-            date: new Date(t.timeStart).toLocaleDateString('vi-VN'),
-            seatNumber: t.seatId,
-            price: new Intl.NumberFormat('vi-VN').format(t.price),
-            status: status,
-          };
-        });
+        const latest = tickets.slice(0, 5).map(t => ({
+          id: t.ticketId,
+          customerName: t.customerName,
+          route: `${t.fromTripStation} - ${t.toTripStation}`,
+          departureTime: new Date(t.timeStart).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+          date: new Date(t.timeStart).toLocaleDateString('vi-VN'),
+          seatNumber: t.seatId,
+          price: new Intl.NumberFormat('vi-VN').format(t.price),
+          status: (t.status === 0 || t.status === 5 ? "confirmed" : t.status === 2 ? "cancelled" : "pending") as "confirmed" | "pending" | "cancelled",
+        }));
         setBookings(latest);
       } catch (e) {
         console.error('Error fetching recent bookings:', e);
@@ -74,9 +63,7 @@ export default function RecentBookings() {
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
           Đặt vé gần đây
         </h3>
-        <button className="text-sm font-medium text-pink-600 hover:text-pink-700 dark:text-pink-400">
-          Xem tất cả
-        </button>
+        
       </div>
 
       <div className="space-y-4">

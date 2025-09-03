@@ -60,7 +60,6 @@ export default function RoutesList() {
           Tuyến đường phổ biến 
         </h3>
         <button className="text-sm font-medium text-pink-600 hover:text-pink-700 dark:text-pink-400">
-          Xem tất cả
         </button>
       </div>
 

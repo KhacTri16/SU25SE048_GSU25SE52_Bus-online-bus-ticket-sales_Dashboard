@@ -28,8 +28,8 @@ type NavItem = {
 const baseNavItems: NavItem[] = [
   {
     icon: <GridIcon />,
-    name: "Dashboard",
-    subItems: [{ name: "XeTiic Dashboard", path: "/", pro: false }],
+    name: "Trang quản lý",
+    subItems: [{ name: "Thống kê trang Xetiic", path: "/", pro: false }],
   },
 
   {
